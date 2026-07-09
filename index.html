@@ -1,0 +1,3235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
+<meta name="theme-color" content="#f97316" />
+<title>我嘞个豆 · 拼豆管理</title>
+<style>
+  /* ============================================================
+     设计变量
+     ============================================================ */
+  :root {
+    --c-bg: #f7f7f8;
+    --c-surface: #ffffff;
+    --c-border: #ececef;
+    --c-text: #1f2937;
+    --c-text-sub: #6b7280;
+    --c-text-mute: #9ca3af;
+    --c-primary: #f97316;
+    --c-primary-soft: #fff3ea;
+    --c-danger: #ef4444;
+    --c-danger-soft: #fef2f2;
+    --c-ok: #10b981;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+    --radius: 14px;
+    --tabbar-h: 60px;
+    --topbar-h: 52px;
+    --maxw: 1100px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input { font-family: inherit; }
+
+  /* ============================================================
+     顶部栏
+     ============================================================ */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    height: var(--topbar-h);
+    background: var(--c-surface);
+    border-bottom: 1px solid var(--c-border);
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+  }
+  .topbar .logo { font-size: 17px; font-weight: 700; }
+  .topbar .logo .dot { color: var(--c-primary); }
+
+  /* ============================================================
+     主体容器
+     ============================================================ */
+  .app { max-width: var(--maxw); margin: 0 auto; }
+  .view { display: none; padding: 12px 14px calc(var(--tabbar-h) + 20px); }
+  .view.active { display: block; }
+
+  /* ============================================================
+     库存 Tab — 工具区
+     ============================================================ */
+  .toolbar { position: sticky; top: var(--topbar-h); z-index: 20; background: var(--c-bg); padding-top: 4px; }
+
+  .search-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .search-box {
+    flex: 1; position: relative;
+  }
+  .search-box input {
+    width: 100%; height: 38px; border: 1px solid var(--c-border);
+    border-radius: 10px; padding: 0 12px 0 34px; font-size: 14px;
+    background: var(--c-surface); color: var(--c-text); outline: none;
+  }
+  .search-box input:focus { border-color: var(--c-primary); }
+  .search-box .icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--c-text-mute); font-size: 15px; }
+
+  .letter-nav {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .letter-nav::-webkit-scrollbar { display: none; }
+  .letter-chip {
+    flex: 0 0 auto; min-width: 34px; height: 30px; padding: 0 10px;
+    border-radius: 8px; background: var(--c-surface); border: 1px solid var(--c-border);
+    font-size: 13px; font-weight: 600; color: var(--c-text-sub);
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .letter-chip.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+
+  .sort-row { display: flex; gap: 8px; align-items: center; padding-bottom: 10px; flex-wrap: wrap; }
+  .sort-btn {
+    height: 30px; padding: 0 12px; border-radius: 8px;
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    font-size: 13px; color: var(--c-text-sub); display: flex; align-items: center; gap: 4px;
+  }
+  .sort-btn.active { color: var(--c-primary); border-color: var(--c-primary); font-weight: 600; }
+  .sort-btn .arrow { font-size: 11px; }
+  .count-hint { margin-left: auto; font-size: 12px; color: var(--c-text-mute); }
+
+  /* ============================================================
+     豆卡片网格
+     ============================================================ */
+  .bead-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  @media (min-width: 768px) { .bead-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1024px) { .bead-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  .bead-card {
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column;
+    gap: 10px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden;
+  }
+  .bead-head { display: flex; align-items: center; gap: 10px; }
+  .swatch {
+    width: 42px; height: 42px; border-radius: 10px; flex: 0 0 auto;
+    border: 1px solid rgba(0,0,0,.08);
+  }
+  .bead-meta { min-width: 0; flex: 1; }
+  .bead-code { font-weight: 700; font-size: 15px; }
+  .bead-name { font-size: 12px; color: var(--c-text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bead-qty-row { display: flex; align-items: baseline; gap: 4px; }
+  .bead-qty { font-size: 22px; font-weight: 700; }
+  .bead-qty-unit { font-size: 12px; color: var(--c-text-mute); }
+
+  .empty {
+    text-align: center; padding: 60px 20px; color: var(--c-text-mute);
+  }
+  .empty .big { font-size: 40px; margin-bottom: 8px; }
+
+  /* ============================================================
+     占位 (后续步骤填充)
+     ============================================================ */
+  .placeholder {
+    text-align: center; padding: 80px 20px; color: var(--c-text-mute);
+  }
+  .placeholder .big { font-size: 44px; margin-bottom: 12px; }
+  .placeholder h2 { color: var(--c-text-sub); font-size: 16px; margin: 0 0 6px; }
+
+  /* ============================================================
+     底部 Tab 导航
+     ============================================================ */
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    height: var(--tabbar-h); background: var(--c-surface);
+    border-top: 1px solid var(--c-border);
+    display: flex; padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar-inner { max-width: var(--maxw); margin: 0 auto; width: 100%; display: flex; }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; color: var(--c-text-mute); font-size: 11px; transition: color .15s;
+  }
+  .tab-item .ico { font-size: 20px; line-height: 1; }
+  .tab-item.active { color: var(--c-primary); }
+
+  /* PC 端：左侧导航（>1024 时把底栏转为顶部并不强制，简化用居中底栏即可保持一致体验） */
+
+  /* ============================================================
+     低库存告警横幅
+     ============================================================ */
+  .alert-banner {
+    display: none; align-items: center; gap: 8px;
+    background: var(--c-danger-soft); border: 1px solid #fecaca;
+    color: var(--c-danger); border-radius: 10px; padding: 10px 12px;
+    margin-bottom: 10px; font-size: 13px; font-weight: 600;
+  }
+  .alert-banner.show { display: flex; }
+  .alert-banner .ico { font-size: 16px; }
+  .alert-banner .go { margin-left: auto; font-size: 12px; opacity: .8; }
+  .alert-banner.filtering { background: var(--c-primary-soft); border-color: #fed7aa; color: var(--c-primary); }
+
+  /* 低库存卡片样式 */
+  .bead-card.low { border-color: #fecaca; box-shadow: 0 0 0 1px #fecaca; }
+  .bead-card .warn-badge {
+    position: absolute; top: 8px; right: 8px; font-size: 14px; display: none;
+  }
+  .bead-card.low .warn-badge { display: block; }
+
+  /* 卡片增减按钮 */
+  .qty-ctrl { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  .qty-ctrl .bead-qty-row { flex: 1; }
+  .step-btn {
+    width: 32px; height: 32px; flex: 0 0 auto; border-radius: 9px;
+    border: 1px solid var(--c-border); background: var(--c-surface);
+    font-size: 18px; font-weight: 600; color: var(--c-text-sub);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .08s, background .15s;
+  }
+  .step-btn:active { transform: scale(.9); }
+  .step-btn.plus { color: var(--c-primary); border-color: #fed7aa; background: var(--c-primary-soft); }
+  .step-btn.minus { color: var(--c-danger); border-color: #fecaca; background: var(--c-danger-soft); }
+  .step-btn:disabled { opacity: .4; }
+  .bead-qty.flash { animation: qtyFlash .4s ease; }
+  @keyframes qtyFlash { 0% { transform: scale(1); } 40% { transform: scale(1.25); color: var(--c-primary); } 100% { transform: scale(1); } }
+
+  /* ============================================================
+     全屏覆盖页（豆详情）
+     ============================================================ */
+  .overlay {
+    position: fixed; inset: 0; z-index: 60; background: var(--c-bg);
+    display: none; flex-direction: column; max-width: var(--maxw); margin: 0 auto;
+  }
+  .overlay.show { display: flex; }
+  .overlay-bar {
+    height: var(--topbar-h); flex: 0 0 auto; display: flex; align-items: center;
+    gap: 10px; padding: 0 12px; background: var(--c-surface); border-bottom: 1px solid var(--c-border);
+  }
+  .overlay-bar .back { font-size: 22px; width: 32px; }
+  .overlay-bar .title { font-weight: 700; font-size: 16px; }
+  .overlay-body { flex: 1; overflow-y: auto; padding: 16px 14px 40px; }
+
+  .detail-hero { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .detail-hero .swatch-lg { width: 72px; height: 72px; border-radius: 16px; border: 1px solid rgba(0,0,0,.08); flex: 0 0 auto; }
+  .detail-hero .code-lg { font-size: 26px; font-weight: 800; }
+  .detail-hero .hex { font-size: 13px; color: var(--c-text-mute); }
+
+  .panel { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+  .panel h3 { margin: 0 0 12px; font-size: 14px; color: var(--c-text-sub); }
+  .big-qty { font-size: 36px; font-weight: 800; text-align: center; margin: 4px 0 14px; }
+  .big-qty small { font-size: 15px; font-weight: 500; color: var(--c-text-mute); }
+
+  .qty-editor { display: flex; gap: 8px; align-items: center; justify-content: center; }
+  .qty-editor input {
+    width: 96px; height: 44px; text-align: center; font-size: 18px; font-weight: 700;
+    border: 1px solid var(--c-border); border-radius: 10px; outline: none; color: var(--c-text);
+  }
+  .qty-editor input:focus { border-color: var(--c-primary); }
+  .circle-btn {
+    width: 44px; height: 44px; border-radius: 12px; font-size: 22px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  }
+  .circle-btn.minus { background: var(--c-danger-soft); color: var(--c-danger); }
+  .circle-btn.plus { background: var(--c-primary-soft); color: var(--c-primary); }
+
+  .row-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .btn {
+    flex: 1; height: 44px; border-radius: 11px; font-size: 15px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-primary { background: var(--c-primary); color: #fff; }
+  .btn-danger { background: var(--c-danger); color: #fff; }
+  .btn-ghost { background: var(--c-surface); border: 1px solid var(--c-border); color: var(--c-text-sub); }
+
+  .field-row { display: flex; align-items: center; gap: 10px; }
+  .field-row label { font-size: 13px; color: var(--c-text-sub); flex: 1; }
+  .field-row input {
+    width: 110px; height: 38px; text-align: center; font-size: 15px;
+    border: 1px solid var(--c-border); border-radius: 9px; outline: none; color: var(--c-text);
+  }
+  .field-row input:focus { border-color: var(--c-primary); }
+  .field-hint { font-size: 12px; color: var(--c-text-mute); margin-top: 8px; }
+
+  /* ============================================================
+     变更记录 / 历史 列表
+     ============================================================ */
+  .log-item {
+    display: flex; align-items: center; gap: 10px; padding: 12px;
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: 12px; margin-bottom: 8px;
+  }
+  .log-item .swatch-sm { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(0,0,0,.08); flex: 0 0 auto; }
+  .log-main { flex: 1; min-width: 0; }
+  .log-line1 { display: flex; align-items: center; gap: 6px; }
+  .log-code { font-weight: 700; }
+  .log-tag { font-size: 11px; padding: 1px 7px; border-radius: 6px; font-weight: 600; }
+  .log-tag.in { background: #ecfdf5; color: var(--c-ok); }
+  .log-tag.out { background: var(--c-danger-soft); color: var(--c-danger); }
+  .log-tag.restore { background: var(--c-primary-soft); color: var(--c-primary); }
+  .log-reason { font-size: 11px; color: var(--c-text-mute); }
+  .log-line2 { font-size: 12px; color: var(--c-text-mute); margin-top: 2px; }
+  .log-right { text-align: right; flex: 0 0 auto; }
+  .log-delta { font-size: 16px; font-weight: 700; }
+  .log-delta.in { color: var(--c-ok); }
+  .log-delta.out { color: var(--c-danger); }
+  .log-after { font-size: 11px; color: var(--c-text-mute); }
+  .restore-btn { margin-top: 4px; font-size: 11px; color: var(--c-primary); border: 1px solid #fed7aa; border-radius: 6px; padding: 2px 8px; background: var(--c-primary-soft); }
+
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-chip {
+    height: 30px; padding: 0 12px; border-radius: 8px; background: var(--c-surface);
+    border: 1px solid var(--c-border); font-size: 13px; color: var(--c-text-sub);
+  }
+  .filter-chip.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+
+  /* ============================================================
+     Modal 确认弹窗
+     ============================================================ */
+  .mask {
+    position: fixed; inset: 0; z-index: 95; background: rgba(0,0,0,.4);
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  .mask.show { display: flex; }
+  .dialog {
+    background: var(--c-surface); border-radius: 16px; padding: 20px; width: 100%;
+    max-width: 340px; box-shadow: var(--shadow-md); animation: toastIn .2s ease;
+  }
+  .dialog h3 { margin: 0 0 8px; font-size: 17px; }
+  .dialog p { margin: 0 0 18px; font-size: 14px; color: var(--c-text-sub); }
+  .dialog .row-actions { margin-top: 0; }
+
+  /* ============================================================
+     批量模式
+     ============================================================ */
+  .batch-btn {
+    height: 30px; padding: 0 12px; border-radius: 8px; background: var(--c-surface);
+    border: 1px solid var(--c-border); font-size: 13px; color: var(--c-text-sub);
+  }
+  .batch-btn.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); font-weight: 600; }
+
+  body.batch-mode .step-btn { display: none; }
+  .bead-card .check {
+    position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid var(--c-border); background: var(--c-surface); display: none;
+    align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700;
+  }
+  body.batch-mode .bead-card .check { display: flex; }
+  body.batch-mode .bead-card .warn-badge { display: none; }
+  .bead-card.selected { border-color: var(--c-primary); box-shadow: 0 0 0 2px var(--c-primary); }
+  .bead-card.selected .check { background: var(--c-primary); border-color: var(--c-primary); }
+
+  .batch-bar {
+    position: fixed; left: 0; right: 0; bottom: var(--tabbar-h); z-index: 45;
+    background: var(--c-surface); border-top: 1px solid var(--c-border);
+    padding: 12px 14px calc(12px);
+    transform: translateY(140%); visibility: hidden;
+    transition: transform .25s ease, visibility .25s;
+  }
+  .batch-bar.show { transform: translateY(0); visibility: visible; }
+  .batch-bar-inner { max-width: var(--maxw); margin: 0 auto; }
+  .batch-info { font-size: 13px; color: var(--c-text-sub); margin-bottom: 10px; display: flex; align-items: center; }
+  .batch-info .sel-count { font-weight: 700; color: var(--c-primary); }
+  .batch-info .clear { margin-left: auto; color: var(--c-text-mute); font-size: 12px; }
+  .batch-ops { display: flex; gap: 8px; align-items: center; }
+  .batch-ops .btn { height: 42px; }
+
+  /* 逐豆数量 底部 sheet */
+  .sheet-mask {
+    position: fixed; inset: 0; z-index: 85; background: rgba(0,0,0,.4);
+    display: none;
+  }
+  .sheet-mask.show { display: block; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 86;
+    background: var(--c-surface); border-radius: 18px 18px 0 0;
+    max-width: var(--maxw); margin: 0 auto;
+    max-height: 85vh; max-height: 85dvh;
+    max-height: min(85dvh, calc(100dvh - var(--kb-h, 0px) - 12px));
+    display: flex; flex-direction: column;
+    transform: translateY(101%); transition: transform .28s ease;
+  }
+  .sheet.show { transform: translateY(calc(-1 * var(--kb-h, 0px))); }
+  .sheet-head {
+    padding: 16px; border-bottom: 1px solid var(--c-border);
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
+  }
+  .sheet-head h3 { margin: 0; font-size: 17px; flex: 1; }
+  .sheet-head .close { font-size: 22px; color: var(--c-text-mute); width: 28px; }
+  .quick-fill {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: var(--c-bg); flex: 0 0 auto; font-size: 13px; color: var(--c-text-sub);
+  }
+  .quick-fill input {
+    width: 70px; height: 34px; text-align: center; font-size: 14px; font-weight: 600;
+    border: 1px solid var(--c-border); border-radius: 8px; outline: none; color: var(--c-text);
+  }
+  .quick-fill input:focus { border-color: var(--c-primary); }
+  .quick-fill .apply {
+    height: 34px; padding: 0 12px; border-radius: 8px; background: var(--c-primary-soft);
+    color: var(--c-primary); border: 1px solid #fed7aa; font-size: 13px; font-weight: 600;
+  }
+  .sheet-body { overflow-y: auto; padding: 6px 14px; flex: 1; }
+  .batch-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--c-border); }
+  .batch-row:last-child { border-bottom: none; }
+  .batch-row .swatch-sm { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(0,0,0,.08); flex: 0 0 auto; }
+  .batch-row .b-code { flex: 1; font-weight: 700; }
+  .batch-row .b-cur { font-size: 11px; color: var(--c-text-mute); font-weight: 400; margin-top: 1px; }
+  .batch-row input {
+    width: 84px; height: 40px; text-align: center; font-size: 16px; font-weight: 700;
+    border: 1px solid var(--c-border); border-radius: 9px; outline: none; color: var(--c-text);
+  }
+  .batch-row input:focus { border-color: var(--c-primary); }
+  .sheet-foot {
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--c-border); flex: 0 0 auto;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .batch-total-row { font-size: 13px; color: var(--c-text-sub); text-align: center; }
+  .batch-total-row b { color: var(--c-primary); font-size: 15px; }
+  .sheet-foot .btn { height: 64px !important; font-size: 18px; border-radius: 14px; }
+  .sheet-foot .btn:disabled { background: #cbd5e1; color: #fff; }
+
+  /* 识图出库预览 */
+  .scan-summary {
+    padding: 10px 14px 4px; font-size: 13px; color: var(--c-text-sub);
+    background: var(--c-bg); flex: 0 0 auto;
+  }
+  .scan-summary b { color: var(--c-text); }
+  .scan-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .scan-row:last-child { border-bottom: none; }
+  .scan-row .swatch-sm { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(0,0,0,.08); flex: 0 0 auto; }
+  .scan-row .b-code { flex: 1; font-weight: 700; font-size: 14px; }
+  .scan-row .b-cur { font-size: 11px; color: var(--c-text-mute); font-weight: 400; margin-top: 2px; }
+  .scan-row .b-need { font-size: 14px; font-weight: 700; color: var(--c-text); min-width: 76px; text-align: right; }
+  .scan-row.short .b-code, .scan-row.short .b-need { color: var(--c-danger); }
+  .scan-row select.b-code-sel {
+    flex: 1; height: 40px; border: 1px solid var(--c-border); border-radius: 9px;
+    padding: 0 8px; font-size: 14px; font-weight: 700; color: var(--c-text);
+    background: #fff; outline: none;
+  }
+  .scan-row select.b-code-sel:focus { border-color: var(--c-primary); }
+  .scan-row input.b-need-inp {
+    width: 90px; height: 40px; text-align: center; font-size: 15px; font-weight: 700;
+    border: 1px solid var(--c-border); border-radius: 9px; outline: none; color: var(--c-text);
+  }
+  .scan-row input.b-need-inp:focus { border-color: var(--c-primary); }
+  .scan-row.short input.b-need-inp { border-color: #fecaca; }
+  .scan-row .del-btn {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--c-danger-soft);
+    color: var(--c-danger); font-size: 18px; font-weight: 700; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scan-empty {
+    padding: 24px 12px; text-align: center; color: var(--c-text-mute); font-size: 13px;
+  }
+  .scan-loading {
+    padding: 24px 12px; text-align: center; color: var(--c-text-sub); font-size: 13px;
+  }
+  .scan-loading .spinner {
+    display: inline-block; width: 18px; height: 18px; margin-right: 8px; vertical-align: middle;
+    border: 2px solid #e5e7eb; border-top-color: var(--c-primary); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .scan-row .short-tag {
+    display: inline-block; margin-left: 6px; font-size: 11px; padding: 1px 6px;
+    background: var(--c-danger-soft); color: var(--c-danger); border-radius: 10px; font-weight: 600;
+  }
+
+  /* 文字出库输入 */
+  .text-out-body { padding: 14px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .text-out-tip { font-size: 13px; color: var(--c-text-sub); line-height: 1.6; margin-bottom: 10px; }
+  .text-out-tip code {
+    display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 6px;
+    background: var(--c-bg); border: 1px solid var(--c-border);
+    font-family: monospace; font-size: 13px; color: var(--c-text);
+  }
+  #textOutInput {
+    width: 100%; min-height: 160px; flex: 1; resize: vertical;
+    border: 1px solid var(--c-border); border-radius: 10px; padding: 12px;
+    font-size: 15px; line-height: 1.6; outline: none; color: var(--c-text);
+    font-family: inherit; box-sizing: border-box;
+  }
+  #textOutInput:focus { border-color: var(--c-primary); }
+
+  /* ============================================================
+     我的 / 设置
+     ============================================================ */
+  .setting-group { margin-bottom: 16px; }
+  .setting-group .group-title { font-size: 12px; color: var(--c-text-mute); padding: 0 4px 8px; }
+  .setting-item {
+    display: flex; align-items: center; gap: 12px; padding: 14px;
+    background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 12px;
+    margin-bottom: 8px;
+  }
+  .setting-item .si-main { flex: 1; min-width: 0; }
+  .setting-item .si-label { font-size: 15px; font-weight: 600; }
+  .setting-item .si-desc { font-size: 12px; color: var(--c-text-mute); margin-top: 2px; }
+  .setting-item input.si-input {
+    width: 90px; height: 38px; text-align: center; font-size: 15px; font-weight: 600;
+    border: 1px solid var(--c-border); border-radius: 9px; outline: none; color: var(--c-text);
+  }
+  .setting-item input.si-input:focus { border-color: var(--c-primary); }
+  .setting-item.danger .si-label { color: var(--c-danger); }
+  .setting-item .si-btn {
+    height: 38px; padding: 0 16px; border-radius: 9px; font-size: 14px; font-weight: 600;
+    background: var(--c-primary); color: #fff;
+  }
+  .setting-item .si-btn.danger { background: var(--c-danger); }
+  .app-stat { text-align: center; color: var(--c-text-mute); font-size: 12px; padding: 20px 0 0; }
+
+  /* ============================================================
+     图库 Tab
+     ============================================================ */
+  .sub-tabs {
+    display: flex; gap: 6px; padding: 4px; background: var(--c-surface);
+    border: 1px solid var(--c-border); border-radius: 12px; margin-bottom: 12px;
+  }
+  .sub-tab {
+    flex: 1; height: 36px; border-radius: 9px; font-size: 14px; font-weight: 600;
+    color: var(--c-text-sub); display: flex; align-items: center; justify-content: center;
+  }
+  .sub-tab.active { background: var(--c-primary); color: #fff; }
+
+  .upload-card {
+    background: var(--c-surface); border: 2px dashed var(--c-border); border-radius: var(--radius);
+    padding: 22px 14px; text-align: center; margin-bottom: 12px;
+    position: relative;
+  }
+  .visually-hidden-file {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); border: 0; opacity: 0;
+  }
+  /* 上传按钮：独立样式，避免和 .btn 打架 */
+  .upload-btn {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    height: 44px; padding: 0 26px; border-radius: 11px;
+    background: var(--c-primary); color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer; -webkit-tap-highlight-color: rgba(0,0,0,.1);
+    box-shadow: var(--shadow-sm);
+  }
+  .upload-card .big { font-size: 38px; margin-bottom: 8px; }
+  .upload-card .hint { font-size: 12px; color: var(--c-text-mute); margin-top: 6px; }
+  .upload-card .btn { display: inline-flex; height: 40px; padding: 0 22px; margin-top: 6px; }
+
+  .pattern-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  @media (min-width: 768px) { .pattern-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1024px) { .pattern-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  .pattern-item {
+    background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 12px;
+    overflow: hidden; position: relative; box-shadow: var(--shadow-sm);
+  }
+  .pattern-thumb {
+    width: 100%; aspect-ratio: 1/1; background: #fafafa; display: flex;
+    align-items: center; justify-content: center; overflow: hidden;
+  }
+  .pattern-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pattern-thumb canvas { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+  .pattern-meta { padding: 8px 10px; }
+  .pattern-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pattern-time { font-size: 11px; color: var(--c-text-mute); margin-top: 2px; }
+
+  /* 图库管理栏 */
+  .gallery-mgmt {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 2px 10px; font-size: 13px; color: var(--c-text-sub);
+  }
+  .gallery-mgmt .link {
+    color: var(--c-primary); font-weight: 600; padding: 6px 4px; cursor: pointer;
+  }
+  .gallery-mgmt .link.danger { color: var(--c-danger); }
+  /* 图库批量模式 */
+  .pattern-item .p-check {
+    position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(255,255,255,.92); border: 2px solid var(--c-text-mute);
+    display: none; align-items: center; justify-content: center;
+    color: transparent; font-size: 14px; z-index: 2;
+    box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  }
+  body.gallery-batch .pattern-item .p-check { display: flex; }
+  .pattern-item.selected .p-check {
+    background: var(--c-primary); border-color: var(--c-primary); color: #fff;
+  }
+  .pattern-item.selected { border-color: var(--c-primary); box-shadow: 0 0 0 2px var(--c-primary); }
+
+  /* 图纸详情 */
+  .pattern-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+  .pattern-actions .btn { flex: 1; }
+  .pattern-detail-img {
+    width: 100%; background: #fff; border: 1px solid var(--c-border); border-radius: 12px;
+    margin-bottom: 14px; overflow: hidden;
+  }
+  .pattern-detail-img img { width: 100%; display: block; image-rendering: -webkit-optimize-contrast; }
+
+  /* 图纸制作 */
+  .maker-section { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .maker-section h3 { margin: 0 0 10px; font-size: 14px; color: var(--c-text-sub); }
+  .size-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .size-chip {
+    height: 36px; padding: 0 14px; border-radius: 9px; background: var(--c-bg);
+    border: 1px solid var(--c-border); font-size: 13px; font-weight: 600; color: var(--c-text-sub);
+  }
+  .size-chip.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+  .size-custom { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+  .size-custom input {
+    width: 70px; height: 36px; text-align: center; font-size: 14px;
+    border: 1px solid var(--c-border); border-radius: 9px; outline: none; color: var(--c-text);
+  }
+  .size-custom input:focus { border-color: var(--c-primary); }
+  .size-custom span { font-size: 13px; color: var(--c-text-mute); }
+
+  .preview-img {
+    width: 100%; max-height: 220px; object-fit: contain; display: block;
+    border: 1px solid var(--c-border); border-radius: 10px; background: #fafafa;
+  }
+
+  /* 像素图渲染 */
+  .pixel-wrap {
+    width: 100%; overflow: auto; background: #fafafa;
+    border: 1px solid var(--c-border); border-radius: 10px;
+    text-align: center; padding: 8px;
+  }
+  .pixel-wrap canvas {
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    max-width: none; display: inline-block;
+  }
+  .pixel-toolbar {
+    display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+    font-size: 12px; color: var(--c-text-sub);
+  }
+  .pixel-toolbar .zoom-btn {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--c-bg);
+    border: 1px solid var(--c-border); font-size: 15px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; color: var(--c-text-sub);
+  }
+  .pixel-toolbar .zoom-info { font-weight: 600; color: var(--c-text); }
+  .pixel-toolbar label { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+
+  .usage-list { max-height: 320px; overflow-y: auto; }
+  .usage-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .usage-row:last-child { border-bottom: none; }
+  .usage-row .swatch-sm { width: 28px; height: 28px; border-radius: 7px; border: 1px solid rgba(0,0,0,.08); flex: 0 0 auto; }
+  .usage-code { flex: 1; font-weight: 700; font-size: 14px; }
+  .usage-qty { font-size: 14px; font-weight: 700; color: var(--c-primary); }
+  .usage-total { padding: 10px 0 4px; text-align: center; font-size: 13px; color: var(--c-text-sub); }
+  .usage-total b { color: var(--c-primary); font-size: 15px; }
+
+  /* ============================================================
+     Toast
+     ============================================================ */
+  #toast-wrap {
+    position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + 20px);
+    transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column;
+    gap: 8px; align-items: center; pointer-events: none;
+  }
+  .toast {
+    background: rgba(31,41,55,.94); color: #fff; padding: 9px 16px; border-radius: 20px;
+    font-size: 13px; box-shadow: var(--shadow-md); animation: toastIn .25s ease;
+    max-width: 80vw;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="logo">我嘞个豆<span class="dot">·</span>拼豆管理</span>
+  </div>
+
+  <div class="app">
+    <!-- ===== 库存 Tab ===== -->
+    <section id="view-stock" class="view active">
+      <div class="alert-banner" id="alertBanner">
+        <span class="ico">⚠️</span>
+        <span id="alertText"></span>
+        <span class="go" id="alertGo">查看 ›</span>
+      </div>
+      <div class="toolbar">
+        <div class="search-row">
+          <div class="search-box">
+            <span class="icon">🔍</span>
+            <input id="searchInput" type="text" placeholder="搜索编号或颜色名称" />
+          </div>
+        </div>
+        <div class="letter-nav" id="letterNav"></div>
+        <div class="sort-row" id="sortRow">
+          <button class="sort-btn active" data-sort="code">编号 <span class="arrow">↑</span></button>
+          <button class="sort-btn" data-sort="qty">余量 <span class="arrow"></span></button>
+          <button class="batch-btn" id="batchToggle">批量</button>
+          <button class="batch-btn" id="textOutToggle">文字出库</button>
+          <span class="count-hint" id="countHint"></span>
+        </div>
+      </div>
+      <div class="bead-grid" id="beadGrid"></div>
+    </section>
+
+    <!-- ===== 变更记录 Tab ===== -->
+    <section id="view-record" class="view">
+      <div class="filter-row" id="recordFilter">
+        <button class="filter-chip active" data-type="all">全部</button>
+        <button class="filter-chip" data-type="in">入库</button>
+        <button class="filter-chip" data-type="out">出库</button>
+        <button class="filter-chip" data-type="restore">回溯</button>
+      </div>
+      <div class="search-row">
+        <div class="search-box">
+          <span class="icon">🔍</span>
+          <input id="recordSearch" type="text" placeholder="按编号搜索记录" />
+        </div>
+      </div>
+      <div id="recordList"></div>
+    </section>
+
+    <!-- ===== 图库 Tab ===== -->
+    <section id="view-gallery" class="view">
+      <div class="sub-tabs" id="gallerySubTabs">
+        <button class="sub-tab active" data-sub="patterns">拼豆图库</button>
+        <button class="sub-tab" data-sub="maker">图纸制作</button>
+      </div>
+
+      <!-- 子页：拼豆图库 -->
+      <div id="sub-patterns">
+        <div class="upload-card">
+          <div class="big">📤</div>
+          <input type="file" id="patternFileInput" accept="image/*" multiple class="visually-hidden-file" />
+          <label for="patternFileInput" class="upload-btn">上传图纸</label>
+          <div class="hint">支持 JPG / PNG，可多选；大图会自动压缩</div>
+        </div>
+        <div class="gallery-mgmt" id="galleryMgmt">
+          <div id="galleryMgmtInfo">共 0 张图纸</div>
+          <span class="link" id="galleryBatch">批量管理</span>
+        </div>
+        <div class="pattern-grid" id="patternGrid"></div>
+      </div>
+
+      <!-- 子页：图纸制作 -->
+      <div id="sub-maker" style="display:none">
+        <div class="maker-section">
+          <input type="file" id="makerFileInput" accept="image/*" class="visually-hidden-file" />
+          <label for="makerFileInput" class="upload-btn">选择图片</label>
+          <div id="makerPreview" style="margin-top:10px; display:none">
+            <img class="preview-img" id="makerPreviewImg" />
+          </div>
+        </div>
+
+        <div class="maker-section" id="makerSizeSection" style="display:none">
+          <h3>2. 选择图纸尺寸</h3>
+          <div class="size-row" id="sizeRow">
+            <button class="size-chip" data-size="29">29×29</button>
+            <button class="size-chip active" data-size="50">50×50</button>
+            <button class="size-chip" data-size="80">80×80</button>
+            <button class="size-chip" data-size="100">100×100</button>
+            <button class="size-chip" data-size="custom">自定义</button>
+          </div>
+          <div class="size-custom" id="sizeCustom" style="display:none">
+            <input id="customW" type="number" min="10" max="200" value="50" />
+            <span>×</span>
+            <input id="customH" type="number" min="10" max="200" value="50" />
+            <span>（10 ~ 200 格）</span>
+          </div>
+          <div class="row-actions" style="margin-top:12px">
+            <button class="btn btn-primary" id="makerGenerateBtn">生成像素图纸</button>
+          </div>
+        </div>
+
+        <div id="makerResult" style="display:none">
+          <div class="maker-section">
+            <h3>3. 像素图纸预览</h3>
+            <div class="pixel-toolbar">
+              <button class="zoom-btn" data-act="zoomOut">−</button>
+              <span class="zoom-info" id="zoomInfo">100%</span>
+              <button class="zoom-btn" data-act="zoomIn">+</button>
+              <button class="zoom-btn" data-act="eraseToggle" id="eraseBtn" title="点击格子删除连通同色块" style="font-size:13px;min-width:52px;width:auto;padding:0 8px">删除多余色块</button>
+              <label><input type="checkbox" id="showCodes" /> 显示编号</label>
+            </div>
+            <div class="pixel-wrap" id="pixelWrap">
+              <canvas id="pixelCanvas"></canvas>
+            </div>
+          </div>
+
+          <div class="maker-section">
+            <h3>4. 用量清单</h3>
+            <div class="usage-list" id="usageList"></div>
+            <div class="usage-total" id="usageTotal"></div>
+          </div>
+
+          <div class="row-actions">
+            <button class="btn btn-ghost" id="makerSaveBtn">保存到相册</button>
+            <button class="btn btn-ghost" id="makerGalleryBtn">存入图库</button>
+            <button class="btn btn-primary" id="makerOutBtn">按此图纸出库</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== 我的 Tab ===== -->
+    <section id="view-me" class="view">
+      <div class="setting-group">
+        <div class="group-title">库存告警</div>
+        <div class="setting-item">
+          <div class="si-main">
+            <div class="si-label">全局告警阈值</div>
+            <div class="si-desc">库存低于此值时告警（单豆可在详情页单独设置覆盖）</div>
+          </div>
+          <input class="si-input" id="setThreshold" type="number" inputmode="numeric" min="0" />
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="group-title">快捷操作</div>
+        <div class="setting-item">
+          <div class="si-main">
+            <div class="si-label">快捷步长</div>
+            <div class="si-desc">首页卡片 + / − 按钮每次增减的粒数</div>
+          </div>
+          <input class="si-input" id="setStep" type="number" inputmode="numeric" min="1" />
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="group-title">数据管理</div>
+        <div class="setting-item danger">
+          <div class="si-main">
+            <div class="si-label">重置所有库存</div>
+            <div class="si-desc">将 221 色库存全部清零，保留基础色值数据。变更记录一并清空。</div>
+          </div>
+          <button class="si-btn danger" id="resetData">重置</button>
+        </div>
+      </div>
+
+      <div class="app-stat" id="appStat"></div>
+    </section>
+  </div>
+
+  <!-- ===== 批量操作栏（选中后才滑出） ===== -->
+  <div class="batch-bar" id="batchBar">
+    <div class="batch-bar-inner">
+      <div class="batch-info">
+        已选 <span class="sel-count" id="selCount">0</span> 种
+        <span class="clear" id="batchClear">清空选择</span>
+      </div>
+      <div class="batch-ops">
+        <button class="btn btn-danger" id="batchOut">批量出库</button>
+        <button class="btn btn-primary" id="batchIn">批量入库</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 图库批量操作栏 ===== -->
+  <div class="batch-bar" id="galleryBar">
+    <div class="batch-bar-inner">
+      <div class="batch-info">
+        已选 <span class="sel-count" id="gallerySelCount">0</span> 张
+        <span class="clear" id="gallerySelClear">清空选择</span>
+      </div>
+      <div class="batch-ops">
+        <button class="btn btn-ghost" id="gallerySelAll">全选</button>
+        <button class="btn btn-danger" id="gallerySelDel">删除已选</button>
+        <button class="btn btn-ghost" id="gallerySelExit">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 逐豆数量 底部 sheet ===== -->
+  <div class="sheet-mask" id="sheetMask"></div>
+  <div class="sheet" id="batchSheet">
+    <div class="sheet-head">
+      <h3 id="sheetTitle">批量入库</h3>
+      <button class="close" id="sheetClose">×</button>
+    </div>
+    <div class="quick-fill">
+      <span>一键填充：</span>
+      <input id="quickQty" type="number" inputmode="numeric" placeholder="数量" min="1" />
+      <button class="apply" id="quickApply">应用到全部</button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+    <div class="sheet-foot">
+      <div class="batch-total-row" id="sheetTotal"></div>
+      <button class="btn btn-primary" id="sheetConfirm">确认</button>
+    </div>
+  </div>
+
+  <!-- ===== 识图出库预览 底部 sheet ===== -->
+  <div class="sheet-mask" id="scanMask"></div>
+  <div class="sheet" id="scanSheet">
+    <div class="sheet-head">
+      <h3 id="scanTitle">识图出库</h3>
+      <button class="close" id="scanClose">×</button>
+    </div>
+    <div class="scan-summary" id="scanSummary"></div>
+    <div class="sheet-body" id="scanBody"></div>
+    <div class="sheet-foot">
+      <div class="batch-total-row" id="scanTotal"></div>
+      <div class="row-actions" style="margin-top:0">
+        <button class="btn btn-ghost" id="scanAddRow">+ 添加一行</button>
+        <button class="btn btn-primary" id="scanConfirm">确认出库</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 文字出库 输入 底部 sheet ===== -->
+  <div class="sheet-mask" id="textOutMask"></div>
+  <div class="sheet" id="textOutSheet">
+    <div class="sheet-head">
+      <h3>文字出库</h3>
+      <button class="close" id="textOutClose">×</button>
+    </div>
+    <div class="text-out-body">
+      <div class="text-out-tip">输入「色号 数量」，可用逗号、空格或换行分隔。例如：<br><code>A11 5，A13 13</code></div>
+      <textarea id="textOutInput" placeholder="A11 5，A13 13&#10;H7 20"></textarea>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-primary" id="textOutParse">识别并预览</button>
+    </div>
+  </div>
+
+  <!-- ===== 底部导航 ===== -->
+  <nav class="tabbar">
+    <div class="tabbar-inner" id="tabbar">
+      <button class="tab-item active" data-tab="stock"><span class="ico">🧺</span>库存</button>
+      <button class="tab-item" data-tab="record"><span class="ico">📝</span>记录</button>
+      <button class="tab-item" data-tab="gallery"><span class="ico">🖼️</span>图库</button>
+      <button class="tab-item" data-tab="me"><span class="ico">⚙️</span>我的</button>
+    </div>
+  </nav>
+
+  <!-- ===== 豆详情 全屏页 ===== -->
+  <div class="overlay" id="detailOverlay">
+    <div class="overlay-bar">
+      <button class="back" id="detailBack">‹</button>
+      <span class="title" id="detailTitle">豆详情</span>
+    </div>
+    <div class="overlay-body" id="detailBody"></div>
+  </div>
+
+  <!-- ===== 通用确认弹窗 ===== -->
+  <div class="mask" id="confirmMask">
+    <div class="dialog">
+      <h3 id="confirmTitle">确认</h3>
+      <p id="confirmText"></p>
+      <div class="row-actions">
+        <button class="btn btn-ghost" id="confirmCancel">取消</button>
+        <button class="btn btn-primary" id="confirmOk">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 通用输入弹窗 ===== -->
+  <div class="mask" id="promptMask">
+    <div class="dialog">
+      <h3 id="promptTitle">输入</h3>
+      <p id="promptText" style="margin-bottom:10px"></p>
+      <input id="promptInput" type="text" style="width:100%;height:42px;padding:0 12px;border:1px solid var(--c-border);border-radius:10px;font-size:15px;outline:none;color:var(--c-text);box-sizing:border-box;margin-bottom:16px" />
+      <div class="row-actions" style="margin-top:0">
+        <button class="btn btn-ghost" id="promptCancel">取消</button>
+        <button class="btn btn-primary" id="promptOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-wrap"></div>
+
+<script>
+/* ============================================================
+   模块 1：基础数据 — Mard 221 色
+   ============================================================ */
+const BEAD_COLORS = [
+  {"id":"A1","code":"A1","name":"","hex":"#FAF4C8","letterGroup":"A"},
+  {"id":"A2","code":"A2","name":"","hex":"#FFFFD5","letterGroup":"A"},
+  {"id":"A3","code":"A3","name":"","hex":"#FEFF8B","letterGroup":"A"},
+  {"id":"A4","code":"A4","name":"","hex":"#FBED56","letterGroup":"A"},
+  {"id":"A5","code":"A5","name":"","hex":"#F4D738","letterGroup":"A"},
+  {"id":"A6","code":"A6","name":"","hex":"#FEAC4C","letterGroup":"A"},
+  {"id":"A7","code":"A7","name":"","hex":"#FE8B4C","letterGroup":"A"},
+  {"id":"A8","code":"A8","name":"","hex":"#FFDA45","letterGroup":"A"},
+  {"id":"A9","code":"A9","name":"","hex":"#FF995B","letterGroup":"A"},
+  {"id":"A10","code":"A10","name":"","hex":"#F77C31","letterGroup":"A"},
+  {"id":"A11","code":"A11","name":"","hex":"#FFDD99","letterGroup":"A"},
+  {"id":"A12","code":"A12","name":"","hex":"#FE9F72","letterGroup":"A"},
+  {"id":"A13","code":"A13","name":"","hex":"#FFC365","letterGroup":"A"},
+  {"id":"A14","code":"A14","name":"","hex":"#FD543D","letterGroup":"A"},
+  {"id":"A15","code":"A15","name":"","hex":"#FFF365","letterGroup":"A"},
+  {"id":"A16","code":"A16","name":"","hex":"#FFFF9F","letterGroup":"A"},
+  {"id":"A17","code":"A17","name":"","hex":"#FFE36E","letterGroup":"A"},
+  {"id":"A18","code":"A18","name":"","hex":"#FEBE7D","letterGroup":"A"},
+  {"id":"A19","code":"A19","name":"","hex":"#FDC72F","letterGroup":"A"},
+  {"id":"A20","code":"A20","name":"","hex":"#FFD568","letterGroup":"A"},
+  {"id":"A21","code":"A21","name":"","hex":"#FFE395","letterGroup":"A"},
+  {"id":"A22","code":"A22","name":"","hex":"#F4E57D","letterGroup":"A"},
+  {"id":"A23","code":"A23","name":"","hex":"#E6C9B7","letterGroup":"A"},
+  {"id":"A24","code":"A24","name":"","hex":"#F7BA22","letterGroup":"A"},
+  {"id":"A25","code":"A25","name":"","hex":"#FFD6BD","letterGroup":"A"},
+  {"id":"A26","code":"A26","name":"","hex":"#FFC830","letterGroup":"A"},
+  {"id":"B1","code":"B1","name":"","hex":"#E6EE31","letterGroup":"B"},
+  {"id":"B2","code":"B2","name":"","hex":"#63F347","letterGroup":"B"},
+  {"id":"B3","code":"B3","name":"","hex":"#9EF780","letterGroup":"B"},
+  {"id":"B4","code":"B4","name":"","hex":"#5DE035","letterGroup":"B"},
+  {"id":"B5","code":"B5","name":"","hex":"#35E352","letterGroup":"B"},
+  {"id":"B6","code":"B6","name":"","hex":"#65E2A6","letterGroup":"B"},
+  {"id":"B7","code":"B7","name":"","hex":"#3DAF80","letterGroup":"B"},
+  {"id":"B8","code":"B8","name":"","hex":"#1C9C4F","letterGroup":"B"},
+  {"id":"B9","code":"B9","name":"","hex":"#27523A","letterGroup":"B"},
+  {"id":"B10","code":"B10","name":"","hex":"#95D3C2","letterGroup":"B"},
+  {"id":"B11","code":"B11","name":"","hex":"#5D722A","letterGroup":"B"},
+  {"id":"B12","code":"B12","name":"","hex":"#166F41","letterGroup":"B"},
+  {"id":"B13","code":"B13","name":"","hex":"#CAE87B","letterGroup":"B"},
+  {"id":"B14","code":"B14","name":"","hex":"#ADE946","letterGroup":"B"},
+  {"id":"B15","code":"B15","name":"","hex":"#2E5132","letterGroup":"B"},
+  {"id":"B16","code":"B16","name":"","hex":"#C5ED9C","letterGroup":"B"},
+  {"id":"B17","code":"B17","name":"","hex":"#9BB13A","letterGroup":"B"},
+  {"id":"B18","code":"B18","name":"","hex":"#E6E649","letterGroup":"B"},
+  {"id":"B19","code":"B19","name":"","hex":"#24BB8C","letterGroup":"B"},
+  {"id":"B20","code":"B20","name":"","hex":"#C2F0CC","letterGroup":"B"},
+  {"id":"B21","code":"B21","name":"","hex":"#156A68","letterGroup":"B"},
+  {"id":"B22","code":"B22","name":"","hex":"#0B3C43","letterGroup":"B"},
+  {"id":"B23","code":"B23","name":"","hex":"#303A21","letterGroup":"B"},
+  {"id":"B24","code":"B24","name":"","hex":"#EEFCA5","letterGroup":"B"},
+  {"id":"B25","code":"B25","name":"","hex":"#4E84CD","letterGroup":"B"},
+  {"id":"B26","code":"B26","name":"","hex":"#807A35","letterGroup":"B"},
+  {"id":"B27","code":"B27","name":"","hex":"#CCE1AF","letterGroup":"B"},
+  {"id":"B28","code":"B28","name":"","hex":"#9EE5B9","letterGroup":"B"},
+  {"id":"B29","code":"B29","name":"","hex":"#C5E254","letterGroup":"B"},
+  {"id":"B30","code":"B30","name":"","hex":"#E2FCB1","letterGroup":"B"},
+  {"id":"B31","code":"B31","name":"","hex":"#BDE792","letterGroup":"B"},
+  {"id":"B32","code":"B32","name":"","hex":"#9CAB5A","letterGroup":"B"},
+  {"id":"C1","code":"C1","name":"","hex":"#E8FFE7","letterGroup":"C"},
+  {"id":"C2","code":"C2","name":"","hex":"#A9F9FC","letterGroup":"C"},
+  {"id":"C3","code":"C3","name":"","hex":"#A0E2FB","letterGroup":"C"},
+  {"id":"C4","code":"C4","name":"","hex":"#41CCFF","letterGroup":"C"},
+  {"id":"C5","code":"C5","name":"","hex":"#01ACEB","letterGroup":"C"},
+  {"id":"C6","code":"C6","name":"","hex":"#50AAF0","letterGroup":"C"},
+  {"id":"C7","code":"C7","name":"","hex":"#3677D2","letterGroup":"C"},
+  {"id":"C8","code":"C8","name":"","hex":"#0F54C0","letterGroup":"C"},
+  {"id":"C9","code":"C9","name":"","hex":"#3248CA","letterGroup":"C"},
+  {"id":"C10","code":"C10","name":"","hex":"#3EBCE2","letterGroup":"C"},
+  {"id":"C11","code":"C11","name":"","hex":"#28DDDE","letterGroup":"C"},
+  {"id":"C12","code":"C12","name":"","hex":"#1C334D","letterGroup":"C"},
+  {"id":"C13","code":"C13","name":"","hex":"#CDE8FF","letterGroup":"C"},
+  {"id":"C14","code":"C14","name":"","hex":"#D5FDFF","letterGroup":"C"},
+  {"id":"C15","code":"C15","name":"","hex":"#22C4C6","letterGroup":"C"},
+  {"id":"C16","code":"C16","name":"","hex":"#1557A8","letterGroup":"C"},
+  {"id":"C17","code":"C17","name":"","hex":"#04D1F6","letterGroup":"C"},
+  {"id":"C18","code":"C18","name":"","hex":"#103344","letterGroup":"C"},
+  {"id":"C19","code":"C19","name":"","hex":"#1887A2","letterGroup":"C"},
+  {"id":"C20","code":"C20","name":"","hex":"#176DAF","letterGroup":"C"},
+  {"id":"C21","code":"C21","name":"","hex":"#BEDDFE","letterGroup":"C"},
+  {"id":"C22","code":"C22","name":"","hex":"#67B4BE","letterGroup":"C"},
+  {"id":"C23","code":"C23","name":"","hex":"#C8E2FF","letterGroup":"C"},
+  {"id":"C24","code":"C24","name":"","hex":"#7CC4FF","letterGroup":"C"},
+  {"id":"C25","code":"C25","name":"","hex":"#A9E5E5","letterGroup":"C"},
+  {"id":"C26","code":"C26","name":"","hex":"#3CAED8","letterGroup":"C"},
+  {"id":"C27","code":"C27","name":"","hex":"#3D8FFA","letterGroup":"C"},
+  {"id":"C28","code":"C28","name":"","hex":"#BBCFED","letterGroup":"C"},
+  {"id":"C29","code":"C29","name":"","hex":"#34488E","letterGroup":"C"},
+  {"id":"D1","code":"D1","name":"","hex":"#AEB4F2","letterGroup":"D"},
+  {"id":"D2","code":"D2","name":"","hex":"#85BEDD","letterGroup":"D"},
+  {"id":"D3","code":"D3","name":"","hex":"#2F54AF","letterGroup":"D"},
+  {"id":"D4","code":"D4","name":"","hex":"#182A84","letterGroup":"D"},
+  {"id":"D5","code":"D5","name":"","hex":"#BB43C5","letterGroup":"D"},
+  {"id":"D6","code":"D6","name":"","hex":"#AC78DE","letterGroup":"D"},
+  {"id":"D7","code":"D7","name":"","hex":"#8854B3","letterGroup":"D"},
+  {"id":"D8","code":"D8","name":"","hex":"#E2D3FF","letterGroup":"D"},
+  {"id":"D9","code":"D9","name":"","hex":"#D5B9F8","letterGroup":"D"},
+  {"id":"D10","code":"D10","name":"","hex":"#361851","letterGroup":"D"},
+  {"id":"D11","code":"D11","name":"","hex":"#B9BAE1","letterGroup":"D"},
+  {"id":"D12","code":"D12","name":"","hex":"#DE9AD4","letterGroup":"D"},
+  {"id":"D13","code":"D13","name":"","hex":"#B90095","letterGroup":"D"},
+  {"id":"D14","code":"D14","name":"","hex":"#8B279B","letterGroup":"D"},
+  {"id":"D15","code":"D15","name":"","hex":"#2F1F90","letterGroup":"D"},
+  {"id":"D16","code":"D16","name":"","hex":"#E3E1EE","letterGroup":"D"},
+  {"id":"D17","code":"D17","name":"","hex":"#C4D4F6","letterGroup":"D"},
+  {"id":"D18","code":"D18","name":"","hex":"#A45EC7","letterGroup":"D"},
+  {"id":"D19","code":"D19","name":"","hex":"#DBC3D7","letterGroup":"D"},
+  {"id":"D20","code":"D20","name":"","hex":"#9C32B2","letterGroup":"D"},
+  {"id":"D21","code":"D21","name":"","hex":"#9A009B","letterGroup":"D"},
+  {"id":"D22","code":"D22","name":"","hex":"#8785A1","letterGroup":"D"},
+  {"id":"D23","code":"D23","name":"","hex":"#EBDAFC","letterGroup":"D"},
+  {"id":"D24","code":"D24","name":"","hex":"#7786E5","letterGroup":"D"},
+  {"id":"D25","code":"D25","name":"","hex":"#494FC7","letterGroup":"D"},
+  {"id":"D26","code":"D26","name":"","hex":"#DFC2F8","letterGroup":"D"},
+  {"id":"E1","code":"E1","name":"","hex":"#FDD3CC","letterGroup":"E"},
+  {"id":"E2","code":"E2","name":"","hex":"#FEC0DF","letterGroup":"E"},
+  {"id":"E3","code":"E3","name":"","hex":"#FFB7E7","letterGroup":"E"},
+  {"id":"E4","code":"E4","name":"","hex":"#E8649E","letterGroup":"E"},
+  {"id":"E5","code":"E5","name":"","hex":"#F551A2","letterGroup":"E"},
+  {"id":"E6","code":"E6","name":"","hex":"#F13D74","letterGroup":"E"},
+  {"id":"E7","code":"E7","name":"","hex":"#C63478","letterGroup":"E"},
+  {"id":"E8","code":"E8","name":"","hex":"#FFDBE9","letterGroup":"E"},
+  {"id":"E9","code":"E9","name":"","hex":"#E970CC","letterGroup":"E"},
+  {"id":"E10","code":"E10","name":"","hex":"#D33793","letterGroup":"E"},
+  {"id":"E11","code":"E11","name":"","hex":"#FCDDD2","letterGroup":"E"},
+  {"id":"E12","code":"E12","name":"","hex":"#F78FC3","letterGroup":"E"},
+  {"id":"E13","code":"E13","name":"","hex":"#B5006D","letterGroup":"E"},
+  {"id":"E14","code":"E14","name":"","hex":"#FFD1BA","letterGroup":"E"},
+  {"id":"E15","code":"E15","name":"","hex":"#F8C7C9","letterGroup":"E"},
+  {"id":"E16","code":"E16","name":"","hex":"#FFF3EB","letterGroup":"E"},
+  {"id":"E17","code":"E17","name":"","hex":"#FFE2EA","letterGroup":"E"},
+  {"id":"E18","code":"E18","name":"","hex":"#FFC7D8","letterGroup":"E"},
+  {"id":"E19","code":"E19","name":"","hex":"#FEBAD5","letterGroup":"E"},
+  {"id":"E20","code":"E20","name":"","hex":"#DBC7D1","letterGroup":"E"},
+  {"id":"E21","code":"E21","name":"","hex":"#BD9DA1","letterGroup":"E"},
+  {"id":"E22","code":"E22","name":"","hex":"#B785A1","letterGroup":"E"},
+  {"id":"E23","code":"E23","name":"","hex":"#937A8D","letterGroup":"E"},
+  {"id":"E24","code":"E24","name":"","hex":"#E1BCE8","letterGroup":"E"},
+  {"id":"F1","code":"F1","name":"","hex":"#FD957B","letterGroup":"F"},
+  {"id":"F2","code":"F2","name":"","hex":"#FC3D46","letterGroup":"F"},
+  {"id":"F3","code":"F3","name":"","hex":"#F74941","letterGroup":"F"},
+  {"id":"F4","code":"F4","name":"","hex":"#FC283C","letterGroup":"F"},
+  {"id":"F5","code":"F5","name":"","hex":"#E7002F","letterGroup":"F"},
+  {"id":"F6","code":"F6","name":"","hex":"#943630","letterGroup":"F"},
+  {"id":"F7","code":"F7","name":"","hex":"#971937","letterGroup":"F"},
+  {"id":"F8","code":"F8","name":"","hex":"#BC0028","letterGroup":"F"},
+  {"id":"F9","code":"F9","name":"","hex":"#E2677A","letterGroup":"F"},
+  {"id":"F10","code":"F10","name":"","hex":"#8A4526","letterGroup":"F"},
+  {"id":"F11","code":"F11","name":"","hex":"#5A2121","letterGroup":"F"},
+  {"id":"F12","code":"F12","name":"","hex":"#FD4E6A","letterGroup":"F"},
+  {"id":"F13","code":"F13","name":"","hex":"#F35744","letterGroup":"F"},
+  {"id":"F14","code":"F14","name":"","hex":"#FF9A4D","letterGroup":"F"},
+  {"id":"F15","code":"F15","name":"","hex":"#D30022","letterGroup":"F"},
+  {"id":"F16","code":"F16","name":"","hex":"#FEC2A6","letterGroup":"F"},
+  {"id":"F17","code":"F17","name":"","hex":"#E69C79","letterGroup":"F"},
+  {"id":"F18","code":"F18","name":"","hex":"#D37C46","letterGroup":"F"},
+  {"id":"F19","code":"F19","name":"","hex":"#E65C79","letterGroup":"F"},
+  {"id":"F20","code":"F20","name":"","hex":"#CD9391","letterGroup":"F"},
+  {"id":"F21","code":"F21","name":"","hex":"#F7B4C6","letterGroup":"F"},
+  {"id":"F22","code":"F22","name":"","hex":"#FDCD00","letterGroup":"F"},
+  {"id":"F23","code":"F23","name":"","hex":"#F67666","letterGroup":"F"},
+  {"id":"F24","code":"F24","name":"","hex":"#E698AA","letterGroup":"F"},
+  {"id":"F25","code":"F25","name":"","hex":"#E5484F","letterGroup":"F"},
+  {"id":"G1","code":"G1","name":"","hex":"#FFE2CE","letterGroup":"G"},
+  {"id":"G2","code":"G2","name":"","hex":"#FFC4AA","letterGroup":"G"},
+  {"id":"G3","code":"G3","name":"","hex":"#F4C3A5","letterGroup":"G"},
+  {"id":"G4","code":"G4","name":"","hex":"#E1B383","letterGroup":"G"},
+  {"id":"G5","code":"G5","name":"","hex":"#EDB045","letterGroup":"G"},
+  {"id":"G6","code":"G6","name":"","hex":"#E99C17","letterGroup":"G"},
+  {"id":"G7","code":"G7","name":"","hex":"#9D5B3E","letterGroup":"G"},
+  {"id":"G8","code":"G8","name":"","hex":"#753832","letterGroup":"G"},
+  {"id":"G9","code":"G9","name":"","hex":"#E5B843","letterGroup":"G"},
+  {"id":"G10","code":"G10","name":"","hex":"#D98C39","letterGroup":"G"},
+  {"id":"G11","code":"G11","name":"","hex":"#E0C593","letterGroup":"G"},
+  {"id":"G12","code":"G12","name":"","hex":"#FFC890","letterGroup":"G"},
+  {"id":"G13","code":"G13","name":"","hex":"#B7714A","letterGroup":"G"},
+  {"id":"G14","code":"G14","name":"","hex":"#8D614C","letterGroup":"G"},
+  {"id":"G15","code":"G15","name":"","hex":"#FCF9E0","letterGroup":"G"},
+  {"id":"G16","code":"G16","name":"","hex":"#F2D9BA","letterGroup":"G"},
+  {"id":"G17","code":"G17","name":"","hex":"#C2A98A","letterGroup":"G"},
+  {"id":"G18","code":"G18","name":"","hex":"#FFE4CC","letterGroup":"G"},
+  {"id":"G19","code":"G19","name":"","hex":"#E07935","letterGroup":"G"},
+  {"id":"G20","code":"G20","name":"","hex":"#A94023","letterGroup":"G"},
+  {"id":"G21","code":"G21","name":"","hex":"#B88558","letterGroup":"G"},
+  {"id":"H1","code":"H1","name":"","hex":"#FDFBFF","letterGroup":"H"},
+  {"id":"H2","code":"H2","name":"","hex":"#FEFFFF","letterGroup":"H"},
+  {"id":"H3","code":"H3","name":"","hex":"#B6B1BA","letterGroup":"H"},
+  {"id":"H4","code":"H4","name":"","hex":"#89858C","letterGroup":"H"},
+  {"id":"H5","code":"H5","name":"","hex":"#48464E","letterGroup":"H"},
+  {"id":"H6","code":"H6","name":"","hex":"#2F2B2F","letterGroup":"H"},
+  {"id":"H7","code":"H7","name":"","hex":"#000000","letterGroup":"H"},
+  {"id":"H8","code":"H8","name":"","hex":"#E7D6DB","letterGroup":"H"},
+  {"id":"H9","code":"H9","name":"","hex":"#EDEDED","letterGroup":"H"},
+  {"id":"H10","code":"H10","name":"","hex":"#EEE9EA","letterGroup":"H"},
+  {"id":"H11","code":"H11","name":"","hex":"#CECDD5","letterGroup":"H"},
+  {"id":"H12","code":"H12","name":"","hex":"#FFF5ED","letterGroup":"H"},
+  {"id":"H13","code":"H13","name":"","hex":"#F5ECED","letterGroup":"H"},
+  {"id":"H14","code":"H14","name":"","hex":"#CFD7D3","letterGroup":"H"},
+  {"id":"H15","code":"H15","name":"","hex":"#9BA6A8","letterGroup":"H"},
+  {"id":"H16","code":"H16","name":"","hex":"#1D1414","letterGroup":"H"},
+  {"id":"H17","code":"H17","name":"","hex":"#FFEFF2","letterGroup":"H"},
+  {"id":"H18","code":"H18","name":"","hex":"#FFFDFF","letterGroup":"H"},
+  {"id":"H19","code":"H19","name":"","hex":"#FEFEF2","letterGroup":"H"},
+  {"id":"H20","code":"H20","name":"","hex":"#949FA3","letterGroup":"H"},
+  {"id":"H21","code":"H21","name":"","hex":"#FFFBE1","letterGroup":"H"},
+  {"id":"H22","code":"H22","name":"","hex":"#CACAD4","letterGroup":"H"},
+  {"id":"H23","code":"H23","name":"","hex":"#9A9D94","letterGroup":"H"},
+  {"id":"M1","code":"M1","name":"","hex":"#BCC6B8","letterGroup":"M"},
+  {"id":"M2","code":"M2","name":"","hex":"#BAA39B","letterGroup":"M"},
+  {"id":"M3","code":"M3","name":"","hex":"#697D80","letterGroup":"M"},
+  {"id":"M4","code":"M4","name":"","hex":"#E3D2BC","letterGroup":"M"},
+  {"id":"M5","code":"M5","name":"","hex":"#D0CCAA","letterGroup":"M"},
+  {"id":"M6","code":"M6","name":"","hex":"#B0A782","letterGroup":"M"},
+  {"id":"M7","code":"M7","name":"","hex":"#B4A497","letterGroup":"M"},
+  {"id":"M8","code":"M8","name":"","hex":"#A38281","letterGroup":"M"},
+  {"id":"M9","code":"M9","name":"","hex":"#B38182","letterGroup":"M"},
+  {"id":"M10","code":"M10","name":"","hex":"#A5828C","letterGroup":"M"},
+  {"id":"M11","code":"M11","name":"","hex":"#C77362","letterGroup":"M"},
+  {"id":"M12","code":"M12","name":"","hex":"#C74449","letterGroup":"M"},
+  {"id":"M13","code":"M13","name":"","hex":"#D19066","letterGroup":"M"},
+  {"id":"M14","code":"M14","name":"","hex":"#C79362","letterGroup":"M"},
+  {"id":"M15","code":"M15","name":"","hex":"#757D78","letterGroup":"M"}
+];
+const LETTER_GROUPS = ["A","B","C","D","E","F","G","H","M"];
+
+/* ============================================================
+   模块 2：存储层 — localStorage 持久化
+   ============================================================ */
+const STORE_KEY = "beadmanager_v1";
+const DEFAULT_THRESHOLD = 50;
+const DEFAULT_STEP = 10;
+
+const Store = {
+  data: null,
+  load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (raw) { this.data = JSON.parse(raw); }
+    } catch (e) { console.warn("读取存储失败，重置", e); }
+    if (!this.data) this.data = this._initial();
+    this._ensureInventory();
+    return this.data;
+  },
+  _initial() {
+    return {
+      settings: { threshold: DEFAULT_THRESHOLD, step: DEFAULT_STEP },
+      inventory: {},      // beadId -> { currentQty, threshold, updatedAt }
+      logs: [],           // BeadChangeLog[]
+      patterns: [],       // BeadPattern[]
+      pixelPatterns: []   // PixelPattern[]
+    };
+  },
+  // 保证每个豆都有库存记录
+  _ensureInventory() {
+    const inv = this.data.inventory;
+    for (const b of BEAD_COLORS) {
+      if (!inv[b.id]) {
+        inv[b.id] = { currentQty: 0, threshold: null, updatedAt: new Date().toISOString() };
+      }
+    }
+  },
+  save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(this.data)); }
+    catch (e) { console.error("保存失败", e); Toast.show("保存失败，存储空间可能已满"); }
+  },
+  // 取某豆的有效阈值（独立阈值优先，否则全局）
+  thresholdOf(beadId) {
+    const t = this.data.inventory[beadId]?.threshold;
+    return (t === null || t === undefined) ? this.data.settings.threshold : t;
+  }
+};
+
+/* ============================================================
+   模块 3：工具函数
+   ============================================================ */
+const beadMap = Object.fromEntries(BEAD_COLORS.map(b => [b.id, b]));
+
+function $(sel, root = document) { return root.querySelector(sel); }
+function $all(sel, root = document) { return [...root.querySelectorAll(sel)]; }
+
+// 编号自然排序：先字母分组，再数字大小
+function codeSortValue(code) {
+  const m = code.match(/^([A-Z]+)(\d+)$/);
+  if (!m) return [code, 0];
+  return [m[1], parseInt(m[2], 10)];
+}
+function compareCode(a, b) {
+  const [la, na] = codeSortValue(a);
+  const [lb, nb] = codeSortValue(b);
+  const gi = LETTER_GROUPS.indexOf(la) - LETTER_GROUPS.indexOf(lb);
+  if (gi !== 0) return gi;
+  return na - nb;
+}
+
+// 判断浅色背景，用于决定文字/边框对比（暂保留，后续详情页用）
+function isLightHex(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return (0.299*r + 0.587*g + 0.114*b) > 186;
+}
+
+const Toast = {
+  show(msg, dur = 2000) {
+    const wrap = $("#toast-wrap");
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = "opacity .3s";
+      el.style.opacity = "0";
+      setTimeout(() => el.remove(), 300);
+    }, dur);
+  }
+};
+
+// 通用确认弹窗（Promise 风格）
+const Modal = {
+  _resolve: null,
+  _pResolve: null,
+  init() {
+    $("#confirmCancel").addEventListener("click", () => this._close(false));
+    $("#confirmOk").addEventListener("click", () => this._close(true));
+    $("#confirmMask").addEventListener("click", e => {
+      if (e.target.id === "confirmMask") this._close(false);
+    });
+    $("#promptCancel").addEventListener("click", () => this._pClose(null));
+    $("#promptOk").addEventListener("click", () => this._pClose($("#promptInput").value));
+    $("#promptMask").addEventListener("click", e => {
+      if (e.target.id === "promptMask") this._pClose(null);
+    });
+    $("#promptInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") this._pClose($("#promptInput").value);
+      if (e.key === "Escape") this._pClose(null);
+    });
+  },
+  confirm({ title = "确认", text = "", okText = "确认", danger = false } = {}) {
+    $("#confirmTitle").textContent = title;
+    $("#confirmText").textContent = text;
+    const ok = $("#confirmOk");
+    ok.textContent = okText;
+    ok.className = "btn " + (danger ? "btn-danger" : "btn-primary");
+    $("#confirmMask").classList.add("show");
+    return new Promise(res => { this._resolve = res; });
+  },
+  _close(val) {
+    $("#confirmMask").classList.remove("show");
+    if (this._resolve) { this._resolve(val); this._resolve = null; }
+  },
+  prompt({ title = "输入", text = "", defaultValue = "", placeholder = "" } = {}) {
+    $("#promptTitle").textContent = title;
+    $("#promptText").textContent = text;
+    $("#promptText").style.display = text ? "" : "none";
+    const inp = $("#promptInput");
+    inp.value = defaultValue;
+    inp.placeholder = placeholder;
+    $("#promptMask").classList.add("show");
+    setTimeout(() => { inp.focus(); inp.select(); }, 50);
+    return new Promise(res => { this._pResolve = res; });
+  },
+  _pClose(val) {
+    $("#promptMask").classList.remove("show");
+    if (this._pResolve) { this._pResolve(val); this._pResolve = null; }
+  }
+};
+
+/* ============================================================
+   模块 X：库存变更引擎 — 所有增减都走这里，统一写变更记录
+   ============================================================ */
+const Inventory = {
+  genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); },
+
+  // 执行一次变更。delta 正=入库，负=出库。返回 { after, logId } 或 null。
+  // 出库不允许低于 0，自动截断。
+  apply(beadId, delta, { reason = "manual", note = "", silent = false } = {}) {
+    const inv = Store.data.inventory[beadId];
+    if (!inv) return null;
+    const before = inv.currentQty;
+    let after = before + delta;
+    if (after < 0) after = 0;
+    const realDelta = after - before;
+    if (realDelta === 0) {
+      if (!silent) Toast.show("库存已为 0，无法继续出库");
+      return { after: before, logId: null };
+    }
+    inv.currentQty = after;
+    inv.updatedAt = new Date().toISOString();
+
+    const log = {
+      id: this.genId(),
+      beadId,
+      type: realDelta > 0 ? "in" : "out",
+      qty: Math.abs(realDelta),
+      reason,
+      note,
+      snapshot: { qtyAfter: after, timestamp: inv.updatedAt },
+      createdAt: inv.updatedAt
+    };
+    Store.data.logs.unshift(log);
+    Store.save();
+
+    if (!silent) {
+      const b = beadMap[beadId];
+      const act = realDelta > 0 ? "入库" : "出库";
+      Toast.show(`${b.code} ${act} ${Math.abs(realDelta)}粒，剩余 ${after}粒`);
+    }
+    return { after, logId: log.id };
+  },
+
+  // 精确设置库存为某值（详情页用），内部转成一次入/出库记录
+  setTo(beadId, target, opts = {}) {
+    const before = Store.data.inventory[beadId].currentQty;
+    return this.apply(beadId, target - before, opts);
+  },
+
+  // 回溯：恢复到某条记录执行之前的状态
+  restore(log) {
+    const inv = Store.data.inventory[log.beadId];
+    // 计算操作前的量：after - delta
+    const qtyBefore = log.snapshot.qtyAfter - (log.type === "in" ? log.qty : -log.qty);
+    const target = qtyBefore;
+    const current = inv.currentQty;
+    if (current === target) { Toast.show("库存已是该状态"); return; }
+    this.apply(log.beadId, target - current, {
+      reason: "restore",
+      note: `回溯到 ${new Date(log.createdAt).toLocaleString("zh-CN")} 操作前的状态`
+    });
+  },
+
+  // 低库存豆列表
+  lowStockBeads() {
+    return BEAD_COLORS.filter(b => {
+      const inv = Store.data.inventory[b.id];
+      return inv.currentQty < Store.thresholdOf(b.id);
+    });
+  }
+};
+
+/* ============================================================
+   模块 4：库存 Tab — UI 状态与渲染
+   ============================================================ */
+const StockView = {
+  state: { letter: "ALL", keyword: "", sortKey: "code", sortAsc: true, lowOnly: false },
+
+  init() {
+    this.renderLetterNav();
+    this.bindEvents();
+    this.render();
+  },
+
+  renderLetterNav() {
+    const nav = $("#letterNav");
+    const chips = ["ALL", ...LETTER_GROUPS];
+    nav.innerHTML = chips.map(l =>
+      `<button class="letter-chip${l === this.state.letter ? " active" : ""}" data-letter="${l}">${l === "ALL" ? "全部" : l}</button>`
+    ).join("");
+  },
+
+  bindEvents() {
+    // 字母筛选
+    $("#letterNav").addEventListener("click", e => {
+      const btn = e.target.closest(".letter-chip");
+      if (!btn) return;
+      this.state.letter = btn.dataset.letter;
+      this.renderLetterNav();
+      this.render();
+    });
+    // 搜索
+    $("#searchInput").addEventListener("input", e => {
+      this.state.keyword = e.target.value.trim().toLowerCase();
+      this.render();
+    });
+    // 排序
+    $("#sortRow").addEventListener("click", e => {
+      const btn = e.target.closest(".sort-btn");
+      if (!btn) return;
+      const key = btn.dataset.sort;
+      if (this.state.sortKey === key) {
+        this.state.sortAsc = !this.state.sortAsc;
+      } else {
+        this.state.sortKey = key;
+        this.state.sortAsc = key === "code";
+        if (key === "qty") this.state.sortAsc = false;
+      }
+      this.render();
+    });
+    // 告警横幅：切换只看低库存
+    $("#alertBanner").addEventListener("click", () => {
+      this.state.lowOnly = !this.state.lowOnly;
+      this.render();
+    });
+    // 卡片上的 +/- 与 点击进详情（事件委托）
+    $("#beadGrid").addEventListener("click", e => {
+      const card = e.target.closest(".bead-card");
+      if (!card) return;
+      const id = card.dataset.id;
+      // 批量模式：点击 = 选中/取消
+      if (Batch.active) {
+        Batch.toggle(id);
+        card.classList.toggle("selected", Batch.selected.has(id));
+        return;
+      }
+      const stepBtn = e.target.closest(".step-btn");
+      if (stepBtn) {
+        e.stopPropagation();
+        const step = Store.data.settings.step;
+        const delta = stepBtn.classList.contains("plus") ? step : -step;
+        Inventory.apply(id, delta);
+        this.updateCard(id);
+        this.renderAlert();
+        return;
+      }
+      Detail.open(id);
+    });
+  },
+
+  getList() {
+    const { letter, keyword, sortKey, sortAsc, lowOnly } = this.state;
+    let list = BEAD_COLORS.slice();
+    if (lowOnly) {
+      list = list.filter(b => Store.data.inventory[b.id].currentQty < Store.thresholdOf(b.id));
+    }
+    if (letter !== "ALL") list = list.filter(b => b.letterGroup === letter);
+    if (keyword) {
+      list = list.filter(b =>
+        b.code.toLowerCase().includes(keyword) ||
+        (b.name && b.name.toLowerCase().includes(keyword))
+      );
+    }
+    list.sort((a, b) => {
+      let r;
+      if (sortKey === "code") {
+        r = compareCode(a.code, b.code);
+      } else {
+        const qa = Store.data.inventory[a.id].currentQty;
+        const qb = Store.data.inventory[b.id].currentQty;
+        r = qa - qb;
+        if (r === 0) r = compareCode(a.code, b.code);
+      }
+      return sortAsc ? r : -r;
+    });
+    return list;
+  },
+
+  renderAlert() {
+    const low = Inventory.lowStockBeads();
+    const banner = $("#alertBanner");
+    if (low.length === 0) {
+      banner.classList.remove("show");
+      this.state.lowOnly = false;
+      return;
+    }
+    banner.classList.add("show");
+    banner.classList.toggle("filtering", this.state.lowOnly);
+    $("#alertText").textContent = this.state.lowOnly
+      ? `正在查看 ${low.length} 种低库存拼豆`
+      : `${low.length} 种拼豆库存不足`;
+    $("#alertGo").textContent = this.state.lowOnly ? "返回全部 ›" : "查看 ›";
+  },
+
+  render() {
+    this.renderAlert();
+    $all("#sortRow .sort-btn").forEach(btn => {
+      const active = btn.dataset.sort === this.state.sortKey;
+      btn.classList.toggle("active", active);
+      const arrow = $(".arrow", btn);
+      arrow.textContent = active ? (this.state.sortAsc ? "↑" : "↓") : "";
+    });
+
+    const list = this.getList();
+    $("#countHint").textContent = `共 ${list.length} 色`;
+
+    const grid = $("#beadGrid");
+    if (list.length === 0) {
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">🔍</div>没有匹配的拼豆</div>`;
+      return;
+    }
+    grid.innerHTML = list.map(b => this.cardHTML(b)).join("");
+  },
+
+  cardHTML(b) {
+    const inv = Store.data.inventory[b.id];
+    const qty = inv.currentQty;
+    const low = qty < Store.thresholdOf(b.id);
+    const name = b.name || "—";
+    const sel = Batch.active && Batch.selected.has(b.id);
+    return `
+      <div class="bead-card${low ? " low" : ""}${sel ? " selected" : ""}" data-id="${b.id}">
+        <span class="check">✓</span>
+        <span class="warn-badge">⚠️</span>
+        <div class="bead-head">
+          <div class="swatch" style="background:${b.hex}"></div>
+          <div class="bead-meta">
+            <div class="bead-code">${b.code}</div>
+            <div class="bead-name">${name}</div>
+          </div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="step-btn minus" aria-label="减少">−</button>
+          <div class="bead-qty-row" style="justify-content:center;flex:1">
+            <span class="bead-qty">${qty}</span>
+            <span class="bead-qty-unit">粒</span>
+          </div>
+          <button class="step-btn plus" aria-label="增加">+</button>
+        </div>
+      </div>`;
+  },
+
+  // 局部刷新单张卡片（带数字动画），避免整列表重渲染
+  updateCard(id) {
+    const card = $(`.bead-card[data-id="${id}"]`);
+    if (!card) return;
+    const inv = Store.data.inventory[id];
+    const qty = inv.currentQty;
+    const low = qty < Store.thresholdOf(id);
+    card.classList.toggle("low", low);
+    const qtyEl = $(".bead-qty", card);
+    qtyEl.textContent = qty;
+    qtyEl.classList.remove("flash");
+    void qtyEl.offsetWidth; // 触发重排以重启动画
+    qtyEl.classList.add("flash");
+    // 若处于"只看低库存"模式且该豆已不低，移除卡片
+    if (this.state.lowOnly && !low) {
+      setTimeout(() => { card.remove(); this.render(); }, 300);
+    }
+  }
+};
+
+/* ============================================================
+   模块 6：豆详情页
+   ============================================================ */
+const Detail = {
+  curId: null,
+  init() {
+    $("#detailBack").addEventListener("click", () => this.close());
+    $("#detailBody").addEventListener("click", e => this.onClick(e));
+  },
+  open(id) {
+    this.curId = id;
+    this.render();
+    $("#detailOverlay").classList.add("show");
+    document.body.style.overflow = "hidden";
+  },
+  close() {
+    $("#detailOverlay").classList.remove("show");
+    document.body.style.overflow = "";
+    this.curId = null;
+    StockView.render();
+  },
+  render() {
+    const id = this.curId;
+    const b = beadMap[id];
+    const inv = Store.data.inventory[id];
+    const effThreshold = Store.thresholdOf(id);
+    const ownThreshold = inv.threshold;
+    $("#detailTitle").textContent = `${b.code} 详情`;
+
+    const logs = Store.data.logs.filter(l => l.beadId === id).slice(0, 30);
+    const historyHTML = logs.length
+      ? logs.map(l => RecordView.itemHTML(l, false)).join("")
+      : `<div class="empty"><div class="big">📭</div>暂无变更记录</div>`;
+
+    $("#detailBody").innerHTML = `
+      <div class="detail-hero">
+        <div class="swatch-lg" style="background:${b.hex}"></div>
+        <div>
+          <div class="code-lg">${b.code}</div>
+          <div class="hex">${b.hex.toUpperCase()}${b.name ? " · " + b.name : ""}</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>当前库存</h3>
+        <div class="big-qty"><span id="dQty">${inv.currentQty}</span> <small>粒</small></div>
+        <div class="qty-editor">
+          <button class="circle-btn minus" data-act="dec">−</button>
+          <input id="dInput" type="number" inputmode="numeric" value="${Store.data.settings.step}" min="1" />
+          <button class="circle-btn plus" data-act="inc">+</button>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-ghost" data-act="setOut">出库此数</button>
+          <button class="btn btn-primary" data-act="setIn">入库此数</button>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-ghost" data-act="setExact">设为精确值</button>
+        </div>
+        <div class="field-hint">「设为精确值」会把库存直接改成输入框中的数字。</div>
+      </div>
+
+      <div class="panel">
+        <h3>独立告警阈值</h3>
+        <div class="field-row">
+          <label>低于此值时告警（留空用全局 ${Store.data.settings.threshold} 粒）</label>
+          <input id="dThreshold" type="number" inputmode="numeric" placeholder="${Store.data.settings.threshold}" value="${ownThreshold ?? ""}" min="0" />
+        </div>
+        <div class="field-hint">当前生效阈值：${effThreshold} 粒。${inv.currentQty < effThreshold ? "⚠️ 当前库存低于阈值。" : ""}</div>
+        <div class="row-actions">
+          <button class="btn btn-primary" data-act="saveThreshold">保存阈值</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>变更历史（最近 ${logs.length} 条）</h3>
+        ${historyHTML}
+      </div>
+    `;
+  },
+  inputVal() {
+    const v = parseInt($("#dInput").value, 10);
+    return isNaN(v) || v < 1 ? 0 : v;
+  },
+  onClick(e) {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const id = this.curId;
+    if (act === "inc") { $("#dInput").value = this.inputVal() + Store.data.settings.step; return; }
+    if (act === "dec") { $("#dInput").value = Math.max(1, this.inputVal() - Store.data.settings.step); return; }
+    if (act === "setIn") {
+      const n = this.inputVal(); if (!n) return Toast.show("请输入有效数量");
+      Inventory.apply(id, n); this.render(); return;
+    }
+    if (act === "setOut") {
+      const n = this.inputVal(); if (!n) return Toast.show("请输入有效数量");
+      Inventory.apply(id, -n); this.render(); return;
+    }
+    if (act === "setExact") {
+      const n = this.inputVal();
+      Inventory.setTo(id, n); this.render(); return;
+    }
+    if (act === "saveThreshold") {
+      const raw = $("#dThreshold").value.trim();
+      Store.data.inventory[id].threshold = raw === "" ? null : Math.max(0, parseInt(raw, 10) || 0);
+      Store.save();
+      Toast.show("阈值已保存");
+      this.render();
+      return;
+    }
+    // 历史里的回溯
+    if (act === "restore") {
+      const logId = btn.dataset.log;
+      const log = Store.data.logs.find(l => l.id === logId);
+      if (log) RecordView.confirmRestore(log, () => this.render());
+    }
+  }
+};
+
+/* ============================================================
+   模块 7：变更记录 Tab
+   ============================================================ */
+const RecordView = {
+  state: { type: "all", keyword: "" },
+  init() {
+    $("#recordFilter").addEventListener("click", e => {
+      const btn = e.target.closest(".filter-chip");
+      if (!btn) return;
+      this.state.type = btn.dataset.type;
+      $all("#recordFilter .filter-chip").forEach(c => c.classList.toggle("active", c === btn));
+      this.render();
+    });
+    $("#recordSearch").addEventListener("input", e => {
+      this.state.keyword = e.target.value.trim().toLowerCase();
+      this.render();
+    });
+    $("#recordList").addEventListener("click", e => {
+      const btn = e.target.closest("[data-act='restore']");
+      if (!btn) return;
+      const log = Store.data.logs.find(l => l.id === btn.dataset.log);
+      if (log) this.confirmRestore(log);
+    });
+  },
+  getList() {
+    let logs = Store.data.logs.slice();
+    if (this.state.type === "in") logs = logs.filter(l => l.type === "in" && l.reason !== "restore");
+    else if (this.state.type === "out") logs = logs.filter(l => l.type === "out" && l.reason !== "restore");
+    else if (this.state.type === "restore") logs = logs.filter(l => l.reason === "restore");
+    if (this.state.keyword) {
+      logs = logs.filter(l => beadMap[l.beadId]?.code.toLowerCase().includes(this.state.keyword));
+    }
+    return logs;
+  },
+  render() {
+    const logs = this.getList();
+    const box = $("#recordList");
+    if (logs.length === 0) {
+      box.innerHTML = `<div class="empty"><div class="big">📭</div>暂无变更记录</div>`;
+      return;
+    }
+    box.innerHTML = logs.map(l => this.itemHTML(l, true)).join("");
+  },
+  // showRestore: 是否显示回溯按钮
+  itemHTML(l, showRestore) {
+    const b = beadMap[l.beadId];
+    const t = new Date(l.createdAt);
+    const timeStr = `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    const reasonMap = { manual: "手动", image_recognition: "识图", batch: "批量", restore: "回溯", text_input: "文字" };
+    const isRestore = l.reason === "restore";
+    const tagClass = isRestore ? "restore" : l.type;
+    const tagText = isRestore ? "回溯" : (l.type === "in" ? "入库" : "出库");
+    const sign = l.type === "in" ? "+" : "−";
+    const qtyBefore = l.snapshot.qtyAfter - (l.type === "in" ? l.qty : -l.qty);
+    return `
+      <div class="log-item">
+        <div class="swatch-sm" style="background:${b.hex}"></div>
+        <div class="log-main">
+          <div class="log-line1">
+            <span class="log-code">${b.code}</span>
+            <span class="log-tag ${tagClass}">${tagText}</span>
+            <span class="log-reason">${reasonMap[l.reason] || l.reason}</span>
+          </div>
+          <div class="log-line2">${timeStr}${l.note ? " · " + escapeHtml(l.note) : ""}</div>
+        </div>
+        <div class="log-right">
+          <div class="log-delta ${l.type}">${sign}${l.qty}</div>
+          <div class="log-after">余 ${qtyBefore}→${l.snapshot.qtyAfter}</div>
+          ${showRestore ? `<button class="restore-btn" data-act="restore" data-log="${l.id}">恢复</button>` : ""}
+        </div>
+      </div>`;
+  },
+  async confirmRestore(log, after) {
+    const b = beadMap[log.beadId];
+    const qtyBefore = log.snapshot.qtyAfter - (log.type === "in" ? log.qty : -log.qty);
+    const ok = await Modal.confirm({
+      title: "恢复到此状态",
+      text: `将 ${b.code} 的库存恢复为 ${qtyBefore} 粒（该操作执行前的状态），并生成一条回溯记录。`,
+      okText: "恢复"
+    });
+    if (!ok) return;
+    Inventory.restore(log);
+    this.render();
+    StockView.render();
+    if (after) after();
+  }
+};
+
+function pad(n) { return n < 10 ? "0" + n : "" + n; }
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+
+/* ============================================================
+   模块 7.5：批量操作
+   ============================================================ */
+const Batch = {
+  active: false,
+  selected: new Set(),
+  curType: "in",
+  init() {
+    $("#batchToggle").addEventListener("click", () => this.toggleMode());
+    $("#batchClear").addEventListener("click", () => this.clear());
+    $("#batchIn").addEventListener("click", () => this.openSheet("in"));
+    $("#batchOut").addEventListener("click", () => this.openSheet("out"));
+    // sheet 交互
+    $("#sheetClose").addEventListener("click", () => this.closeSheet());
+    $("#sheetMask").addEventListener("click", () => this.closeSheet());
+    $("#quickApply").addEventListener("click", () => this.quickFill());
+    $("#sheetConfirm").addEventListener("click", () => this.commit());
+    $("#sheetBody").addEventListener("input", () => this.updateTotal());
+  },
+  toggleMode() {
+    this.active = !this.active;
+    document.body.classList.toggle("batch-mode", this.active);
+    $("#batchToggle").classList.toggle("active", this.active);
+    $("#batchToggle").textContent = this.active ? "完成" : "批量";
+    if (!this.active) this.selected.clear();
+    this.updateInfo();
+    StockView.render();
+  },
+  toggle(id) {
+    if (this.selected.has(id)) this.selected.delete(id);
+    else this.selected.add(id);
+    this.updateInfo();
+  },
+  clear() {
+    this.selected.clear();
+    $all(".bead-card.selected").forEach(c => c.classList.remove("selected"));
+    this.updateInfo();
+  },
+  // 选中数量驱动底部操作栏的显隐
+  updateInfo() {
+    $("#selCount").textContent = this.selected.size;
+    $("#batchBar").classList.toggle("show", this.active && this.selected.size > 0);
+  },
+
+  // 打开逐豆填数 sheet
+  openSheet(type) {
+    if (this.selected.size === 0) { Toast.show("请先选择拼豆"); return; }
+    this.curType = type;
+    const actText = type === "in" ? "入库" : "出库";
+    $("#sheetTitle").textContent = `批量${actText}`;
+    $("#sheetConfirm").className = "btn " + (type === "out" ? "btn-danger" : "btn-primary");
+    $("#sheetConfirm").textContent = `确认${actText}`;
+    $("#quickQty").value = "";
+
+    const ids = [...this.selected].sort((a, b) => compareCode(beadMap[a].code, beadMap[b].code));
+    $("#sheetBody").innerHTML = ids.map(id => {
+      const b = beadMap[id];
+      const cur = Store.data.inventory[id].currentQty;
+      return `
+        <div class="batch-row" data-id="${id}">
+          <div class="swatch-sm" style="background:${b.hex}"></div>
+          <div class="b-code">${b.code}<div class="b-cur">当前 ${cur} 粒</div></div>
+          <input type="number" inputmode="numeric" min="0" value="" placeholder="0" data-bid="${id}" />
+        </div>`;
+    }).join("");
+    this.updateTotal();
+
+    $("#sheetMask").classList.add("show");
+    $("#batchSheet").classList.add("show");
+  },
+  closeSheet() {
+    $("#sheetMask").classList.remove("show");
+    $("#batchSheet").classList.remove("show");
+  },
+  quickFill() {
+    const v = parseInt($("#quickQty").value, 10);
+    if (isNaN(v) || v < 0) { Toast.show("请输入有效数量"); return; }
+    $all("#sheetBody input").forEach(inp => { inp.value = v; });
+    this.updateTotal();
+  },
+  // 收集每行的数量（>0 才算）
+  collect() {
+    const items = [];
+    $all("#sheetBody input").forEach(inp => {
+      const q = parseInt(inp.value, 10);
+      if (!isNaN(q) && q > 0) items.push({ id: inp.dataset.bid, qty: q });
+    });
+    return items;
+  },
+  updateTotal() {
+    const items = this.collect();
+    const sum = items.reduce((s, it) => s + it.qty, 0);
+    const actText = this.curType === "in" ? "入库" : "出库";
+    $("#sheetTotal").innerHTML = `${items.length} 种拼豆 · 共${actText} <b>${sum}</b> 粒`;
+  },
+  async commit() {
+    const items = this.collect();
+    if (items.length === 0) { Toast.show("请至少为一种拼豆填写数量"); return; }
+    const actText = this.curType === "in" ? "入库" : "出库";
+    const sum = items.reduce((s, it) => s + it.qty, 0);
+    const ok = await Modal.confirm({
+      title: `批量${actText}`,
+      text: `将对 ${items.length} 种拼豆按各自数量${actText}，共 ${sum} 粒。`,
+      okText: actText,
+      danger: this.curType === "out"
+    });
+    if (!ok) return;
+    const sign = this.curType === "in" ? 1 : -1;
+    items.forEach(it => Inventory.apply(it.id, sign * it.qty, { reason: "batch", silent: true }));
+    Toast.show(`已批量${actText}：${items.length} 种拼豆`);
+    this.closeSheet();
+    this.toggleMode(); // 退出批量模式并刷新库存
+    RecordView.render();
+  }
+};
+
+/* ============================================================
+   模块 7.6：我的 / 设置
+   ============================================================ */
+const Settings = {
+  init() {
+    const th = $("#setThreshold"), st = $("#setStep");
+    th.value = Store.data.settings.threshold;
+    st.value = Store.data.settings.step;
+    th.addEventListener("change", () => {
+      const v = Math.max(0, parseInt(th.value, 10) || 0);
+      th.value = v;
+      Store.data.settings.threshold = v;
+      Store.save();
+      Toast.show("全局阈值已更新");
+    });
+    st.addEventListener("change", () => {
+      const v = Math.max(1, parseInt(st.value, 10) || 1);
+      st.value = v;
+      Store.data.settings.step = v;
+      Store.save();
+      Toast.show("快捷步长已更新");
+    });
+    $("#resetData").addEventListener("click", () => this.reset());
+    this.renderStat();
+  },
+  async reset() {
+    const ok = await Modal.confirm({
+      title: "重置所有库存",
+      text: "确定将 221 色库存全部清零、清空全部变更记录吗？此操作不可撤销。",
+      okText: "确认重置",
+      danger: true
+    });
+    if (!ok) return;
+    for (const b of BEAD_COLORS) {
+      Store.data.inventory[b.id] = { currentQty: 0, threshold: null, updatedAt: new Date().toISOString() };
+    }
+    Store.data.logs = [];
+    Store.save();
+    Toast.show("已重置所有库存");
+    StockView.render();
+    RecordView.render();
+    this.renderStat();
+  },
+  renderStat() {
+    const total = BEAD_COLORS.reduce((s, b) => s + Store.data.inventory[b.id].currentQty, 0);
+    $("#appStat").textContent = `我嘞个豆 · 共 ${BEAD_COLORS.length} 色 · 库存合计 ${total} 粒 · ${Store.data.logs.length} 条记录`;
+  }
+};
+
+/* ============================================================
+   模块 7.7：图像工具 — 压缩、读取、像素提取
+   ============================================================ */
+const ImageUtil = {
+  // 读文件 -> dataURL
+  fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
+    });
+  },
+  // dataURL -> Image
+  loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  },
+  // 压缩图片：保持长边 <= maxSize，输出 jpeg dataURL（老接口保留兼容）
+  async compress(file, maxSize = 2400, quality = 0.95) {
+    const url = await this.fileToDataURL(file);
+    const img = await this.loadImage(url);
+    let { width: w, height: h } = img;
+    if (Math.max(w, h) > maxSize) {
+      const s = maxSize / Math.max(w, h);
+      w = Math.round(w * s); h = Math.round(h * s);
+    }
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, w, h);
+    return cv.toDataURL("image/jpeg", quality);
+  },
+  // 压缩后输出 Blob（存 IndexedDB 用，比 dataURL 小 33%）
+  async compressToBlob(file, maxSize = 2400, quality = 0.95) {
+    const url = await this.fileToDataURL(file);
+    const img = await this.loadImage(url);
+    let { width: w, height: h } = img;
+    if (Math.max(w, h) > maxSize) {
+      const s = maxSize / Math.max(w, h);
+      w = Math.round(w * s); h = Math.round(h * s);
+    }
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, w, h);
+    return new Promise((resolve, reject) => {
+      cv.toBlob(blob => blob ? resolve(blob) : reject(new Error("toBlob 失败")), "image/jpeg", quality);
+    });
+  }
+};
+
+/* ============================================================
+   模块 7.7b：图片持久化 — IndexedDB
+   patterns 数组只存元信息 (id/name/createdAt/relatedLogIds)，
+   图片 Blob 单独存 IndexedDB，key = patternId。
+   ============================================================ */
+const ImageDB = {
+  _db: null,
+  _urlCache: new Map(), // patternId -> objectURL（避免重复 createObjectURL）
+  DB_NAME: "beadDB",
+  STORE: "images",
+  open() {
+    if (this._db) return Promise.resolve(this._db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.DB_NAME, 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.STORE)) db.createObjectStore(this.STORE);
+      };
+      req.onsuccess = e => { this._db = e.target.result; resolve(this._db); };
+      req.onerror = e => reject(e.target.error);
+    });
+  },
+  async put(id, blob) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.STORE, "readwrite");
+      tx.objectStore(this.STORE).put(blob, id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = e => reject(e.target.error);
+    });
+  },
+  async get(id) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.STORE, "readonly");
+      const req = tx.objectStore(this.STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = e => reject(e.target.error);
+    });
+  },
+  async delete(id) {
+    const url = this._urlCache.get(id);
+    if (url) { URL.revokeObjectURL(url); this._urlCache.delete(id); }
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.STORE, "readwrite");
+      tx.objectStore(this.STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = e => reject(e.target.error);
+    });
+  },
+  async getURL(id) {
+    if (this._urlCache.has(id)) return this._urlCache.get(id);
+    const blob = await this.get(id);
+    if (!blob) return "";
+    const url = URL.createObjectURL(blob);
+    this._urlCache.set(id, url);
+    return url;
+  },
+  // 撤销所有 objectURL（暂未使用，保留给内存吃紧时清理）
+  revokeAll() {
+    for (const [, url] of this._urlCache) URL.revokeObjectURL(url);
+    this._urlCache.clear();
+  }
+};
+
+// 预计算 221 色 RGB 缓存，便于颜色匹配
+const BEAD_RGB = BEAD_COLORS.map(b => {
+  const r = parseInt(b.hex.slice(1, 3), 16);
+  const g = parseInt(b.hex.slice(3, 5), 16);
+  const bl = parseInt(b.hex.slice(5, 7), 16);
+  return { id: b.id, r, g, b: bl };
+});
+function findClosestBead(r, g, b) {
+  let min = Infinity, hit = BEAD_RGB[0];
+  for (const c of BEAD_RGB) {
+    const d = (r - c.r) ** 2 + (g - c.g) ** 2 + (b - c.b) ** 2;
+    if (d < min) { min = d; hit = c; }
+  }
+  return hit.id;
+}
+
+/* ============================================================
+   模块 7.8：拼豆图库（手动上传管理）
+   ============================================================ */
+const Gallery = {
+  state: { sub: "patterns", batch: false, selected: new Set() },
+  init() {
+    $("#gallerySubTabs").addEventListener("click", e => {
+      const t = e.target.closest(".sub-tab");
+      if (!t) return;
+      this.switchSub(t.dataset.sub);
+    });
+    $("#patternFileInput").addEventListener("change", e => this.onUpload(e.target.files));
+    $("#patternGrid").addEventListener("click", e => {
+      const item = e.target.closest(".pattern-item");
+      if (!item) return;
+      if (this.state.batch) {
+        this.toggleSel(item.dataset.id);
+      } else {
+        PatternDetail.open(item.dataset.id);
+      }
+    });
+    $("#galleryBatch").addEventListener("click", () => this.toggleBatch());
+    $("#gallerySelClear").addEventListener("click", () => { this.state.selected.clear(); this.refreshSel(); });
+    $("#gallerySelAll").addEventListener("click", () => this.selectAll());
+    $("#gallerySelDel").addEventListener("click", () => this.deleteSelected());
+    $("#gallerySelExit").addEventListener("click", () => this.toggleBatch());
+  },
+  toggleBatch() {
+    this.state.batch = !this.state.batch;
+    this.state.selected.clear();
+    document.body.classList.toggle("gallery-batch", this.state.batch);
+    $("#galleryBatch").textContent = this.state.batch ? "退出管理" : "批量管理";
+    this.render();
+    this.refreshSel();
+  },
+  toggleSel(id) {
+    if (this.state.selected.has(id)) this.state.selected.delete(id);
+    else this.state.selected.add(id);
+    // 只更新那张卡片
+    const el = document.querySelector(`.pattern-item[data-id="${id}"]`);
+    if (el) el.classList.toggle("selected", this.state.selected.has(id));
+    this.refreshSel();
+  },
+  selectAll() {
+    Store.data.patterns.forEach(p => this.state.selected.add(p.id));
+    $all(".pattern-item").forEach(el => el.classList.add("selected"));
+    this.refreshSel();
+  },
+  refreshSel() {
+    const n = this.state.selected.size;
+    $("#gallerySelCount").textContent = n;
+    $("#galleryBar").classList.toggle("show", this.state.batch && n > 0);
+  },
+  async deleteSelected() {
+    const ids = Array.from(this.state.selected);
+    if (ids.length === 0) return;
+    const ok = await Modal.confirm({
+      title: "删除已选图纸",
+      text: `将删除 ${ids.length} 张图纸，此操作不可撤销（不影响已生成的出库记录）。`,
+      okText: "删除",
+      danger: true
+    });
+    if (!ok) return;
+    Store.data.patterns = Store.data.patterns.filter(p => !this.state.selected.has(p.id));
+    Store.save();
+    for (const id of ids) { try { await ImageDB.delete(id); } catch (e) { console.warn(e); } }
+    this.state.selected.clear();
+    Toast.show(`已删除 ${ids.length} 张`);
+    this.refreshSel();
+    this.render();
+  },
+  switchSub(name) {
+    // 切到图纸制作时若在批量则退出
+    if (name !== "patterns" && this.state.batch) this.toggleBatch();
+    this.state.sub = name;
+    $all("#gallerySubTabs .sub-tab").forEach(t => t.classList.toggle("active", t.dataset.sub === name));
+    $("#sub-patterns").style.display = name === "patterns" ? "" : "none";
+    $("#sub-maker").style.display = name === "maker" ? "" : "none";
+    if (name === "patterns") this.render();
+  },
+  async onUpload(files) {
+    if (!files || files.length === 0) return;
+    let added = 0;
+    for (const f of files) {
+      if (!f.type.startsWith("image/")) continue;
+      try {
+        const blob = await ImageUtil.compressToBlob(f, 2400, 0.95);
+        const id = Inventory.genId();
+        await ImageDB.put(id, blob);
+        const now = new Date();
+        const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        Store.data.patterns.unshift({
+          id,
+          name: `图纸_${stamp}`,
+          createdAt: now.toISOString(),
+          relatedLogIds: []
+        });
+        added++;
+      } catch (e) { console.error(e); Toast.show("上传失败：" + (e.message || "存储错误")); }
+    }
+    Store.save();
+    Toast.show(`已上传 ${added} 张图纸`);
+    $("#patternFileInput").value = "";
+    this.render();
+  },
+  async render() {
+    const list = Store.data.patterns;
+    $("#galleryMgmtInfo").textContent = `共 ${list.length} 张图纸`;
+    const grid = $("#patternGrid");
+    if (list.length === 0) {
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">📭</div>暂无图纸，点上方按钮上传</div>`;
+      return;
+    }
+    grid.innerHTML = list.map(p => `
+      <div class="pattern-item ${this.state.selected.has(p.id) ? "selected" : ""}" data-id="${p.id}">
+        <div class="p-check">✓</div>
+        <div class="pattern-thumb"><img data-pid="${p.id}" alt="" /></div>
+        <div class="pattern-meta">
+          <div class="pattern-name">${escapeHtml(p.name)}</div>
+          <div class="pattern-time">${formatTime(p.createdAt)}</div>
+        </div>
+      </div>`).join("");
+    // 逐张异步取 objectURL 塞进 img.src
+    for (const p of list) {
+      const img = grid.querySelector(`img[data-pid="${p.id}"]`);
+      if (!img) continue;
+      try {
+        const url = await ImageDB.getURL(p.id);
+        if (url) img.src = url;
+      } catch (e) { console.warn("加载图纸失败", p.id, e); }
+    }
+  }
+};
+
+/* ============================================================
+   模块 7.9：图纸详情（手动上传的图纸）
+   ============================================================ */
+const PatternDetail = {
+  curId: null,
+  init() {
+    // 复用 Detail 的全屏覆盖结构？不行——它绑了 Detail.render。
+    // 这里直接接管 detailOverlay，区分通过 curId 是否在 patterns 中。
+  },
+  async open(id) {
+    this.curId = id;
+    const p = Store.data.patterns.find(x => x.id === id);
+    if (!p) return;
+    $("#detailTitle").textContent = p.name;
+    const relatedLogs = (p.relatedLogIds || []).map(lid => Store.data.logs.find(l => l.id === lid)).filter(Boolean);
+    const relatedHTML = relatedLogs.length
+      ? relatedLogs.map(l => RecordView.itemHTML(l, false)).join("")
+      : `<div class="empty"><div class="big">📭</div>暂无关联出库记录</div>`;
+    $("#detailBody").innerHTML = `
+      <div class="pattern-actions">
+        <button class="btn btn-primary" data-pact="scan">按图纸出库</button>
+        <button class="btn btn-ghost" data-pact="rename">重命名</button>
+        <button class="btn btn-danger" data-pact="delete">删除</button>
+      </div>
+      <div class="pattern-detail-img"><img id="patternDetailImg" alt="" /></div>
+      <div class="panel">
+        <h3>关联出库记录</h3>
+        ${relatedHTML}
+      </div>`;
+    // 一次性绑定动作（替换之前可能挂的事件）
+    const body = $("#detailBody");
+    body.onclick = e => {
+      const btn = e.target.closest("[data-pact]");
+      if (!btn) return;
+      if (btn.dataset.pact === "rename") this.rename();
+      if (btn.dataset.pact === "delete") this.del();
+      if (btn.dataset.pact === "scan") this.scan();
+    };
+    // 复用现有的 overlay 容器，但要替换 back 行为
+    $("#detailOverlay").classList.add("show");
+    document.body.style.overflow = "hidden";
+    $("#detailBack").onclick = () => this.close();
+    // 异步加载图片
+    try {
+      const url = await ImageDB.getURL(id);
+      const el = $("#patternDetailImg");
+      if (el && url) el.src = url;
+    } catch (e) { console.warn(e); }
+  },
+  close() {
+    $("#detailOverlay").classList.remove("show");
+    document.body.style.overflow = "";
+    this.curId = null;
+    $("#detailBody").onclick = null;
+    $("#detailBack").onclick = () => Detail.close(); // 还原默认
+    Gallery.render();
+  },
+  async rename() {
+    const p = Store.data.patterns.find(x => x.id === this.curId);
+    if (!p) return;
+    const name = await Modal.prompt({ title: "重命名图纸", defaultValue: p.name, placeholder: "图纸名称" });
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) { Toast.show("名称不能为空"); return; }
+    p.name = trimmed;
+    Store.save();
+    $("#detailTitle").textContent = trimmed;
+    Toast.show("已重命名");
+  },
+  async scan() {
+    const p = Store.data.patterns.find(x => x.id === this.curId);
+    if (!p) { Toast.show("图纸缺失"); return; }
+    // 有 beadCounts 元数据（图纸制作里存入图库的），直接精准出库
+    if (p.beadCounts && Object.keys(p.beadCounts).length > 0) {
+      ScanOut.open({
+        counts: p.beadCounts,
+        title: `图纸「${p.name}」`,
+        note: `按图纸出库：${p.name}`,
+        patternId: p.id
+      });
+      return;
+    }
+    // 外部上传的图纸没有色号数据 — 打开空表让用户手动录入
+    ScanOut.open({
+      counts: null,
+      title: `图纸「${p.name}」`,
+      note: `按图纸出库：${p.name}`,
+      patternId: p.id
+    });
+    Toast.show("此图纸无色号数据，请手动填写");
+  },
+  refresh() {
+    if (!this.curId) return;
+    const p = Store.data.patterns.find(x => x.id === this.curId);
+    if (!p) return;
+    // 只重渲关联记录区块
+    const relatedLogs = (p.relatedLogIds || []).map(lid => Store.data.logs.find(l => l.id === lid)).filter(Boolean);
+    const relatedHTML = relatedLogs.length
+      ? relatedLogs.map(l => RecordView.itemHTML(l, false)).join("")
+      : `<div class="empty"><div class="big">📭</div>暂无关联出库记录</div>`;
+    const panel = $("#detailBody").querySelector(".panel");
+    if (panel) panel.innerHTML = `<h3>关联出库记录</h3>${relatedHTML}`;
+  },
+  async del() {
+    const ok = await Modal.confirm({
+      title: "删除图纸", text: "删除后无法恢复（不影响已生成的出库记录）。",
+      okText: "删除", danger: true
+    });
+    if (!ok) return;
+    const id = this.curId;
+    Store.data.patterns = Store.data.patterns.filter(p => p.id !== id);
+    Store.save();
+    try { await ImageDB.delete(id); } catch (e) { console.warn(e); }
+    Toast.show("已删除");
+    this.close();
+  }
+};
+
+/* ============================================================
+   模块 7.10：图纸制作（图片转像素图）
+   ============================================================ */
+const Maker = {
+  state: {
+    sourceImg: null,
+    sourceDataURL: "",
+    size: 50,
+    customMode: false,
+    result: null,
+    zoom: 1,
+    showCodes: false,
+    eraseMode: false
+  },
+  init() {
+    $("#makerFileInput").addEventListener("change", e => this.onPick(e.target.files[0]));
+    $("#sizeRow").addEventListener("click", e => {
+      const c = e.target.closest(".size-chip");
+      if (!c) return;
+      $all("#sizeRow .size-chip").forEach(x => x.classList.toggle("active", x === c));
+      if (c.dataset.size === "custom") {
+        this.state.customMode = true;
+        $("#sizeCustom").style.display = "flex";
+      } else {
+        this.state.customMode = false;
+        this.state.size = parseInt(c.dataset.size, 10);
+        $("#sizeCustom").style.display = "none";
+      }
+    });
+    $("#makerGenerateBtn").addEventListener("click", () => this.generate());
+    $(".pixel-toolbar").addEventListener("click", e => {
+      const b = e.target.closest("[data-act]");
+      if (!b) return;
+      if (b.dataset.act === "zoomIn") this.setZoom(this.state.zoom * 1.25);
+      if (b.dataset.act === "zoomOut") this.setZoom(this.state.zoom / 1.25);
+      if (b.dataset.act === "eraseToggle") {
+        this.state.eraseMode = !this.state.eraseMode;
+        $("#eraseBtn").style.background = this.state.eraseMode ? "var(--c-danger)" : "";
+        $("#eraseBtn").style.color = this.state.eraseMode ? "#fff" : "";
+        $("#eraseBtn").style.borderColor = this.state.eraseMode ? "var(--c-danger)" : "";
+        $("#pixelCanvas").style.cursor = this.state.eraseMode ? "crosshair" : "default";
+        if (this.state.eraseMode) Toast.show("删除多余色块模式已开启，点击格子删除连通色块");
+      }
+    });
+    $("#pixelCanvas").addEventListener("click", e => this.onCanvasClick(e));
+    $("#showCodes").addEventListener("change", e => {
+      this.state.showCodes = e.target.checked;
+      this.renderPixelCanvas();
+    });
+    $("#makerSaveBtn").addEventListener("click", () => this.save());
+    $("#makerGalleryBtn").addEventListener("click", () => this.saveToGallery());
+    $("#makerOutBtn").addEventListener("click", () => this.outByPattern());
+  },
+  async onPick(file) {
+    if (!file) return;
+    const url = await ImageUtil.compress(file, 2400, 0.95);
+    this.state.sourceDataURL = url;
+    this.state.sourceImg = await ImageUtil.loadImage(url);
+    $("#makerPreview").style.display = "";
+    $("#makerPreviewImg").src = url;
+    $("#makerSizeSection").style.display = "";
+    $("#makerResult").style.display = "none";
+    $("#makerFileInput").value = "";
+  },
+  // 删除多余色块模式：点击 canvas 格子，flood fill 删除连通同色块
+  onCanvasClick(e) {
+    if (!this.state.eraseMode) return;
+    const r = this.state.result;
+    if (!r) return;
+    const cv = $("#pixelCanvas");
+    const rect = cv.getBoundingClientRect();
+    const baseCell = this.state._baseCell || 12;
+    const cell = Math.max(2, Math.round(baseCell * this.state.zoom));
+    const gx = Math.floor((e.clientX - rect.left) / cell);
+    const gy = Math.floor((e.clientY - rect.top) / cell);
+    if (gx < 0 || gx >= r.width || gy < 0 || gy >= r.height) return;
+    const targetId = r.gridData[gy][gx];
+    if (!targetId) return;
+    const count = this.floodFill(gx, gy, targetId);
+    this.renderPixelCanvas();
+    this.renderUsage();
+    Toast.show(`已擦除 ${beadMap[targetId].code} 色块 ${count} 格`);
+  },
+  floodFill(startX, startY, targetId) {
+    const r = this.state.result;
+    const visited = new Uint8Array(r.width * r.height);
+    const stack = [];
+    let count = 0;
+    const push = (x, y) => {
+      if (x < 0 || x >= r.width || y < 0 || y >= r.height) return;
+      const k = y * r.width + x;
+      if (visited[k]) return;
+      if (r.gridData[y][x] !== targetId) return;
+      visited[k] = 1;
+      stack.push(x, y);
+    };
+    push(startX, startY);
+    while (stack.length) {
+      const y = stack.pop(), x = stack.pop();
+      r.gridData[y][x] = null;
+      count++;
+      // 8 连通：上下左右 + 四个对角
+      push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+      push(x + 1, y + 1); push(x - 1, y - 1); push(x + 1, y - 1); push(x - 1, y + 1);
+    }
+    if (count > 0) {
+      r.beadCounts[targetId] = (r.beadCounts[targetId] || 0) - count;
+      if (r.beadCounts[targetId] <= 0) delete r.beadCounts[targetId];
+    }
+    return count;
+  },
+  resolveSize() {
+    const img = this.state.sourceImg;
+    if (!img) return null;
+    let tw, th;
+    if (this.state.customMode) {
+      tw = clamp(parseInt($("#customW").value, 10) || 50, 10, 200);
+      th = clamp(parseInt($("#customH").value, 10) || 50, 10, 200);
+    } else {
+      const long = this.state.size;
+      const ratio = img.width / img.height;
+      if (ratio >= 1) { tw = long; th = Math.max(10, Math.round(long / ratio)); }
+      else { th = long; tw = Math.max(10, Math.round(long * ratio)); }
+    }
+    return { tw, th };
+  },
+  generate() {
+    if (!this.state.sourceImg) { Toast.show("请先选择图片"); return; }
+    const size = this.resolveSize();
+    if (!size) return;
+    const { tw, th } = size;
+    const cv = document.createElement("canvas");
+    cv.width = tw; cv.height = th;
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.state.sourceImg, 0, 0, tw, th);
+    const data = ctx.getImageData(0, 0, tw, th).data;
+
+    const grid = [];
+    const counts = {};
+    for (let y = 0; y < th; y++) {
+      const row = [];
+      for (let x = 0; x < tw; x++) {
+        const i = (y * tw + x) * 4;
+        const a = data[i + 3];
+        if (a < 30) { row.push(null); continue; }
+        const id = findClosestBead(data[i], data[i + 1], data[i + 2]);
+        row.push(id);
+        counts[id] = (counts[id] || 0) + 1;
+      }
+      grid.push(row);
+    }
+    this.state.result = { width: tw, height: th, gridData: grid, beadCounts: counts };
+    this.state.zoom = 1;
+    $("#makerResult").style.display = "";
+    requestAnimationFrame(() => {
+      this.state._baseCell = this.computeFitCell();
+      this.renderPixelCanvas();
+      $("#zoomInfo").textContent = "100%";
+    });
+    this.renderUsage();
+  },
+  setZoom(z) {
+    this.state.zoom = clamp(z, 0.3, 8);
+    $("#zoomInfo").textContent = Math.round(this.state.zoom * 100) + "%";
+    this.renderPixelCanvas();
+  },
+  // 计算能让图纸完整展示在容器内的每格像素基准值
+  computeFitCell() {
+    const r = this.state.result; if (!r) return 12;
+    const wrap = $("#pixelWrap");
+    // 容器内可用宽度（减去 padding）
+    const avail = Math.max(200, wrap.clientWidth - 16);
+    const cell = Math.floor(avail / r.width);
+    return Math.max(2, cell);
+  },
+  renderPixelCanvas() {
+    const r = this.state.result; if (!r) return;
+    const baseCell = this.state._baseCell || 12;
+    const cell = Math.max(2, Math.round(baseCell * this.state.zoom));
+    const cv = $("#pixelCanvas");
+    cv.width = r.width * cell;
+    cv.height = r.height * cell;
+    cv.style.cursor = this.state.eraseMode ? "crosshair" : "default";
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < r.height; y++) {
+      for (let x = 0; x < r.width; x++) {
+        const id = r.gridData[y][x];
+        if (!id) { ctx.clearRect(x * cell, y * cell, cell, cell); continue; }
+        ctx.fillStyle = beadMap[id].hex;
+        ctx.fillRect(x * cell, y * cell, cell, cell);
+      }
+    }
+    // 网格线
+    if (cell >= 6) {
+      ctx.strokeStyle = "rgba(0,0,0,.1)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= r.width; x++) { ctx.moveTo(x*cell + 0.5, 0); ctx.lineTo(x*cell + 0.5, r.height*cell); }
+      for (let y = 0; y <= r.height; y++) { ctx.moveTo(0, y*cell + 0.5); ctx.lineTo(r.width*cell, y*cell + 0.5); }
+      ctx.stroke();
+    }
+    // 编号
+    if (this.state.showCodes && cell >= 14) {
+      ctx.font = `${Math.floor(cell * 0.42)}px -apple-system, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let y = 0; y < r.height; y++) {
+        for (let x = 0; x < r.width; x++) {
+          const id = r.gridData[y][x];
+          if (!id) continue;
+          ctx.fillStyle = isLightHex(beadMap[id].hex) ? "#333" : "#fff";
+          ctx.fillText(id, x * cell + cell/2, y * cell + cell/2);
+        }
+      }
+    }
+  },
+  renderUsage() {
+    const r = this.state.result; if (!r) return;
+    const entries = Object.entries(r.beadCounts).map(([id, q]) => ({ id, q }));
+    entries.sort((a, b) => b.q - a.q);
+    const total = entries.reduce((s, e) => s + e.q, 0);
+    $("#usageList").innerHTML = entries.map(e => {
+      const b = beadMap[e.id];
+      return `<div class="usage-row">
+        <div class="swatch-sm" style="background:${b.hex}"></div>
+        <div class="usage-code">${b.code}</div>
+        <div class="usage-qty">${e.q} 粒</div>
+      </div>`;
+    }).join("");
+    $("#usageTotal").innerHTML = `共 ${entries.length} 色 · 合计 <b>${total}</b> 粒`;
+  },
+  // 渲染一张"高清导出"用的图纸 Canvas，带网格、编号，底部附带色号用量清单
+  buildExportCanvas() {
+    const r = this.state.result; if (!r) return null;
+
+    // ---- 图纸部分 ----
+    // 目标：单格至少 48px（编号清晰），最大总边 ~8192px（浏览器 canvas 上限 16384，这里留一半余量）
+    const maxSide = Math.max(r.width, r.height);
+    let cell = Math.max(48, Math.min(80, Math.floor(6400 / maxSide)));
+    if (cell * maxSide > 8000) cell = Math.floor(8000 / maxSide);
+    const gridW = r.width * cell;
+    const gridH = r.height * cell;
+
+    // ---- 色号统计部分 ----
+    const entries = Object.entries(r.beadCounts).map(([id, q]) => ({ id, q }));
+    entries.sort((a, b) => b.q - a.q);
+    const totalBeads = entries.reduce((s, e) => s + e.q, 0);
+
+    // 布局：整张画布宽 = 图纸宽度（至少 720，方便阅读）；用量表按列排布，避免过长
+    const padding = 32;
+    const canvasW = Math.max(gridW, 720);
+    const legendTop = gridH + padding * 2 + 60; // 顶部标题 + 图纸 + gap
+    const rowH = 44;
+    const swatchSize = 28;
+    // 每列最多多少行（尽量控制在图纸宽度内），至少 1 列
+    const minColW = 220;
+    const cols = Math.max(1, Math.floor(canvasW / minColW));
+    const colW = Math.floor(canvasW / cols);
+    const rowsPerCol = Math.ceil(entries.length / cols);
+    const legendH = rowsPerCol * rowH + 60; // 60 = 底部合计行
+    const canvasH = legendTop + legendH + padding;
+
+    const cv = document.createElement("canvas");
+    cv.width = canvasW;
+    cv.height = canvasH;
+    const ctx = cv.getContext("2d");
+
+    // 背景
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // 顶部标题
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "bold 28px -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(`拼豆图纸 ${r.width} × ${r.height}`, padding, padding);
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "16px -apple-system, sans-serif";
+    ctx.fillText(`${entries.length} 色 · 合计 ${totalBeads} 粒 · ${formatTime(new Date().toISOString())}`, padding, padding + 34);
+
+    // 图纸区域（居中）
+    const gridX = Math.floor((canvasW - gridW) / 2);
+    const gridY = padding + 78;
+    ctx.save();
+    ctx.translate(gridX, gridY);
+    ctx.imageSmoothingEnabled = false;
+    // 色块
+    for (let y = 0; y < r.height; y++) {
+      for (let x = 0; x < r.width; x++) {
+        const id = r.gridData[y][x];
+        if (!id) continue;
+        ctx.fillStyle = beadMap[id].hex;
+        ctx.fillRect(x * cell, y * cell, cell, cell);
+      }
+    }
+    // 网格线
+    ctx.strokeStyle = "rgba(0,0,0,.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= r.width; x++) { ctx.moveTo(x*cell + 0.5, 0); ctx.lineTo(x*cell + 0.5, r.height*cell); }
+    for (let y = 0; y <= r.height; y++) { ctx.moveTo(0, y*cell + 0.5); ctx.lineTo(r.width*cell, y*cell + 0.5); }
+    ctx.stroke();
+    // 编号
+    ctx.font = `${Math.floor(cell * 0.4)}px -apple-system, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let y = 0; y < r.height; y++) {
+      for (let x = 0; x < r.width; x++) {
+        const id = r.gridData[y][x];
+        if (!id) continue;
+        ctx.fillStyle = isLightHex(beadMap[id].hex) ? "#333" : "#fff";
+        ctx.fillText(id, x * cell + cell/2, y * cell + cell/2);
+      }
+    }
+    ctx.restore();
+
+    // ---- 色号用量清单 ----
+    // 分隔线
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, legendTop - 20);
+    ctx.lineTo(canvasW - padding, legendTop - 20);
+    ctx.stroke();
+
+    // 小标题
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "bold 20px -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("色号用量清单", padding, legendTop - 8);
+
+    // 按列渲染每种颜色
+    const listTop = legendTop + 28;
+    entries.forEach((e, i) => {
+      const col = Math.floor(i / rowsPerCol);
+      const row = i % rowsPerCol;
+      const x = col * colW + padding / 2;
+      const y = listTop + row * rowH;
+      const b = beadMap[e.id];
+      // 色块
+      ctx.fillStyle = b.hex;
+      ctx.fillRect(x + 8, y + (rowH - swatchSize) / 2, swatchSize, swatchSize);
+      ctx.strokeStyle = "rgba(0,0,0,.15)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 8 + 0.5, y + (rowH - swatchSize) / 2 + 0.5, swatchSize - 1, swatchSize - 1);
+      // 编号
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "bold 16px -apple-system, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(b.code, x + 8 + swatchSize + 12, y + rowH / 2);
+      // 数量（右对齐到该列尾）
+      ctx.fillStyle = "#f97316";
+      ctx.font = "bold 16px -apple-system, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${e.q} 粒`, x + colW - 16, y + rowH / 2);
+    });
+
+    // 底部合计
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "bold 18px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`共 ${entries.length} 色 · 合计 ${totalBeads} 粒`, canvasW / 2, listTop + rowsPerCol * rowH + 24);
+
+    return cv;
+  },
+  save() {
+    const cv = this.buildExportCanvas();
+    if (!cv) return;
+    const fileName = `拼豆图纸_${this.state.result.width}x${this.state.result.height}_${formatStamp()}.png`;
+    // Blob 下载对移动端更兼容
+    cv.toBlob(blob => {
+      if (!blob) { Toast.show("生成图片失败"); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      Toast.show("图纸已导出，请在下载或相册中查看");
+    }, "image/png");
+  },
+  async saveToGallery() {
+    const r = this.state.result;
+    if (!r) { Toast.show("请先生成图纸"); return; }
+    const cv = this.buildExportCanvas();
+    if (!cv) { Toast.show("生成图片失败"); return; }
+    const blob = await new Promise(resolve => cv.toBlob(resolve, "image/png"));
+    if (!blob) { Toast.show("生成图片失败"); return; }
+    try {
+      const id = Inventory.genId();
+      await ImageDB.put(id, blob);
+      const now = new Date();
+      const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      Store.data.patterns.unshift({
+        id,
+        name: `图纸_${r.width}x${r.height}_${stamp}`,
+        createdAt: now.toISOString(),
+        relatedLogIds: [],
+        beadCounts: { ...r.beadCounts }
+      });
+      Store.save();
+      Toast.show("已存入图库");
+    } catch (e) {
+      console.error(e);
+      Toast.show("存入图库失败：" + (e.message || "存储错误"));
+    }
+  },
+  outByPattern() {
+    const r = this.state.result; if (!r) return;
+    ScanOut.open({
+      counts: r.beadCounts,
+      title: `图纸 ${r.width}×${r.height}`,
+      note: `来自图纸制作 ${r.width}×${r.height}`,
+      patternId: null
+    });
+  }
+};
+
+/* ============================================================
+   模块 7.11：识图出库 — 从图纸计算用量清单 → 预览 → 一键出库
+   rows 是可编辑的 [{id, q}] 数组，用户可增删改
+   ============================================================ */
+const ScanOut = {
+  state: { rows: [], note: "", patternId: null, title: "", loading: false, reason: "image_recognition" },
+  _codeOptionsHTML: null, // 复用色号下拉 options 字符串
+  init() {
+    $("#scanClose").addEventListener("click", () => this.close());
+    $("#scanMask").addEventListener("click", () => this.close());
+    $("#scanConfirm").addEventListener("click", () => this.confirm());
+    $("#scanAddRow").addEventListener("click", () => this.addRow());
+    $("#scanBody").addEventListener("input", e => this.onInput(e));
+    $("#scanBody").addEventListener("click", e => this.onClick(e));
+  },
+  getCodeOptions() {
+    if (this._codeOptionsHTML) return this._codeOptionsHTML;
+    this._codeOptionsHTML = `<option value="">-- 选色号 --</option>` +
+      BEAD_COLORS.map(b => `<option value="${b.id}">${b.code}</option>`).join("");
+    return this._codeOptionsHTML;
+  },
+  // counts: { beadId: qty } 或 null（用于 OCR 前打开 loading）
+  open({ counts, title = "识图出库", note = "", patternId = null, loading = false, reason = "image_recognition" }) {
+    // counts 转 rows；未识别到时给空行
+    let rows = [];
+    if (counts && Object.keys(counts).length > 0) {
+      rows = Object.entries(counts).map(([id, q]) => ({ id, q })).sort((a, b) => b.q - a.q);
+    } else if (!loading) {
+      rows = [{ id: "", q: 0 }];
+    }
+    this.state = { rows, note, patternId, title, loading, reason };
+    $("#scanTitle").textContent = title || "识图出库";
+    this.render();
+    $("#scanMask").classList.add("show");
+    $("#scanSheet").classList.add("show");
+  },
+  // OCR 完成后由外部调用，替换 rows 并刷新
+  setRows(rows) {
+    this.state.rows = rows.length > 0 ? rows : [{ id: "", q: 0 }];
+    this.state.loading = false;
+    this.render();
+  },
+  setLoading(flag) {
+    this.state.loading = flag;
+    this.render();
+  },
+  close() {
+    $("#scanMask").classList.remove("show");
+    $("#scanSheet").classList.remove("show");
+    this.state = { rows: [], note: "", patternId: null, title: "", loading: false, reason: "image_recognition" };
+  },
+  addRow() {
+    this.state.rows.push({ id: "", q: 0 });
+    this.render();
+    // 聚焦到新增行的下拉
+    const rows = $all("#scanBody .scan-row");
+    const last = rows[rows.length - 1];
+    if (last) last.querySelector("select")?.focus();
+  },
+  onInput(e) {
+    const row = e.target.closest(".scan-row");
+    if (!row) return;
+    const idx = parseInt(row.dataset.idx, 10);
+    if (isNaN(idx) || !this.state.rows[idx]) return;
+    if (e.target.classList.contains("b-code-sel")) {
+      this.state.rows[idx].id = e.target.value;
+      this.updateRow(idx);
+    } else if (e.target.classList.contains("b-need-inp")) {
+      const v = parseInt(e.target.value, 10);
+      this.state.rows[idx].q = isNaN(v) || v < 0 ? 0 : v;
+      this.updateRow(idx);
+    }
+    this.updateFooter();
+  },
+  onClick(e) {
+    const del = e.target.closest(".del-btn");
+    if (del) {
+      const row = del.closest(".scan-row");
+      const idx = parseInt(row.dataset.idx, 10);
+      this.state.rows.splice(idx, 1);
+      if (this.state.rows.length === 0) this.state.rows.push({ id: "", q: 0 });
+      this.render();
+    }
+  },
+  rowHTML(row, idx) {
+    const b = row.id ? beadMap[row.id] : null;
+    const cur = row.id ? (Store.data.inventory[row.id]?.currentQty ?? 0) : 0;
+    const short = row.id && row.q > cur;
+    return `
+      <div class="scan-row ${short ? "short" : ""}" data-idx="${idx}">
+        <div class="swatch-sm" style="background:${b ? b.hex : "#e5e7eb"}"></div>
+        <select class="b-code-sel">${this.getCodeOptions().replace(`value="${row.id}"`, `value="${row.id}" selected`)}</select>
+        <input class="b-need-inp" type="number" inputmode="numeric" min="0" value="${row.q || ""}" placeholder="数量" />
+        <button class="del-btn" type="button" aria-label="删除">−</button>
+      </div>
+    `;
+  },
+  render() {
+    const { rows, title, loading, patternId } = this.state;
+
+    // 顶部摘要
+    const source = title || (patternId ? "图库图纸" : "图纸");
+    if (loading) {
+      $("#scanSummary").innerHTML = `<div>来源：<b>${escapeHtml(source)}</b></div><div>识别中，请稍候…</div>`;
+    } else {
+      const filled = rows.filter(r => r.id && r.q > 0);
+      const totalNeed = filled.reduce((s, r) => s + r.q, 0);
+      let shortKinds = 0, shortNeed = 0;
+      filled.forEach(r => {
+        const cur = Store.data.inventory[r.id]?.currentQty ?? 0;
+        if (cur < r.q) { shortKinds++; shortNeed += (r.q - cur); }
+      });
+      $("#scanSummary").innerHTML = `
+        <div>来源：<b>${escapeHtml(source)}</b></div>
+        <div>共 <b>${filled.length}</b> 色 · <b>${totalNeed}</b> 粒
+          ${shortKinds > 0 ? `<span class="short-tag">库存不足 ${shortKinds} 色，缺 ${shortNeed} 粒</span>` : ""}
+        </div>
+      `;
+    }
+
+    // 主体
+    if (loading) {
+      $("#scanBody").innerHTML = `<div class="scan-loading"><span class="spinner"></span>正在识别图纸底部色号…</div>`;
+    } else {
+      $("#scanBody").innerHTML = rows.map((r, i) => this.rowHTML(r, i)).join("");
+    }
+    this.updateFooter();
+  },
+  updateRow(idx) {
+    // 只更新那一行的 swatch/短缺样式，不重渲染避免打断输入
+    const row = $(`#scanBody .scan-row[data-idx="${idx}"]`);
+    if (!row) return;
+    const r = this.state.rows[idx];
+    const b = r.id ? beadMap[r.id] : null;
+    const cur = r.id ? (Store.data.inventory[r.id]?.currentQty ?? 0) : 0;
+    const short = r.id && r.q > cur;
+    row.classList.toggle("short", !!short);
+    row.querySelector(".swatch-sm").style.background = b ? b.hex : "#e5e7eb";
+  },
+  updateFooter() {
+    const { rows, loading } = this.state;
+    if (loading) {
+      $("#scanTotal").innerHTML = "&nbsp;";
+      $("#scanConfirm").disabled = true;
+      return;
+    }
+    const filled = rows.filter(r => r.id && r.q > 0);
+    const totalNeed = filled.reduce((s, r) => s + r.q, 0);
+    let shortNeed = 0;
+    filled.forEach(r => {
+      const cur = Store.data.inventory[r.id]?.currentQty ?? 0;
+      if (cur < r.q) shortNeed += (r.q - cur);
+    });
+    $("#scanTotal").innerHTML = shortNeed > 0
+      ? `合计出库 <b>${totalNeed - shortNeed}</b> 粒 · <span style="color:var(--c-danger)">${shortNeed} 粒库存不足将按 0 截断</span>`
+      : `合计出库 <b>${totalNeed}</b> 粒`;
+    $("#scanConfirm").disabled = filled.length === 0;
+  },
+  async confirm() {
+    const { rows, note, patternId, title, reason } = this.state;
+    // 合并同色号的多行
+    const merged = {};
+    rows.forEach(r => {
+      if (r.id && r.q > 0) merged[r.id] = (merged[r.id] || 0) + r.q;
+    });
+    const entries = Object.entries(merged);
+    if (entries.length === 0) { Toast.show("请至少填写一项色号和数量"); return; }
+    const totalNeed = entries.reduce((s, [, q]) => s + q, 0);
+    // 库存不足二次确认
+    let shortKinds = 0, shortNeed = 0;
+    entries.forEach(([id, q]) => {
+      const cur = Store.data.inventory[id]?.currentQty ?? 0;
+      if (cur < q) { shortKinds++; shortNeed += (q - cur); }
+    });
+    if (shortKinds > 0) {
+      const go = await Modal.confirm({
+        title: "库存不足确认",
+        text: `${shortKinds} 色库存不足，缺 ${shortNeed} 粒，将按当前库存扣至 0。是否继续？`,
+        okText: "继续出库",
+        danger: true
+      });
+      if (!go) return;
+    }
+    const logIds = [];
+    entries.forEach(([id, q]) => {
+      const ret = Inventory.apply(id, -q, { reason: reason || "image_recognition", note, silent: true });
+      if (ret && ret.logId) logIds.push(ret.logId);
+    });
+    if (patternId) {
+      const p = Store.data.patterns.find(x => x.id === patternId);
+      if (p) {
+        p.relatedLogIds = (p.relatedLogIds || []).concat(logIds);
+        Store.save();
+      }
+    }
+    const realOut = totalNeed - shortNeed;
+    Toast.show(`${reason === "text_input" ? "文字出库" : "识图出库"} ${realOut} 粒`);
+    this.close();
+    StockView.render();
+    RecordView.render();
+    if (patternId) PatternDetail.refresh();
+  }
+};
+
+/* ============================================================
+   模块 7.12：文字出库 — 解析「色号 数量」文本 → 复用 ScanOut 确认单
+   ============================================================ */
+const TextOut = {
+  init() {
+    $("#textOutToggle").addEventListener("click", () => this.open());
+    $("#textOutClose").addEventListener("click", () => this.close());
+    $("#textOutMask").addEventListener("click", () => this.close());
+    $("#textOutParse").addEventListener("click", () => this.parseAndPreview());
+  },
+  open() {
+    $("#textOutInput").value = "";
+    $("#textOutMask").classList.add("show");
+    $("#textOutSheet").classList.add("show");
+    setTimeout(() => $("#textOutInput").focus(), 100);
+  },
+  close() {
+    $("#textOutMask").classList.remove("show");
+    $("#textOutSheet").classList.remove("show");
+  },
+  // 解析文本 → { counts: {beadId: qty}, unknown: [原始token], missingQty: [色号] }
+  parse(text) {
+    const counts = {};
+    const unknown = [];
+    const missingQty = [];
+    if (!text) return { counts, unknown, missingQty };
+
+    // 归一化分隔符：把中英文逗号、顿号、分号、冒号、连字符、括号、换行等都变成空格
+    const normalized = text
+      .replace(/[，,、；;：:\-\t\r\n()（）\[\]【】{}]+/g, " ")
+      .trim();
+    // 提取所有「字母+数字」形式的 token（色号），以及独立数字（数量）
+    // 统一策略：先按空格切成 token，再逐个判定
+    const rawTokens = normalized.split(/\s+/).filter(Boolean);
+
+    // 进一步拆分黏在一起的写法：如 "A11" 后面直接跟数量被空格分开时无需处理；
+    // 若 token 同时含字母段+数字段+字母段（如 "A115A13"）较罕见，这里按常规「字母开头段 = 色号」处理。
+    const tokens = [];
+    rawTokens.forEach(tok => {
+      // 把形如 A11 与纯数字混排的情况保持原样；仅将「色号紧跟数量」如 A11x 不做强拆（交由成对逻辑）
+      tokens.push(tok);
+    });
+
+    // 成对解析：色号(字母+数字) 后面跟数量(纯数字)
+    let i = 0;
+    while (i < tokens.length) {
+      const tok = tokens[i];
+      const codeOnly = tok.match(/^[A-Za-z]+\d+$/);
+      if (codeOnly) {
+        const code = tok.toUpperCase();
+        const bead = BEAD_COLORS.find(b => b.code.toUpperCase() === code);
+        if (!bead) { unknown.push(tok); i++; continue; }
+        // 找数量：下一个纯数字 token
+        const next = tokens[i + 1];
+        if (next && /^\d+$/.test(next)) {
+          const q = parseInt(next, 10);
+          if (q > 0) counts[bead.id] = (counts[bead.id] || 0) + q;
+          else missingQty.push(code);
+          i += 2;
+        } else {
+          // 没跟数量
+          missingQty.push(code);
+          i++;
+        }
+      } else if (/^\d+$/.test(tok)) {
+        // 孤立数字（前面没有配对到色号）→ 忽略但记为无法识别
+        unknown.push(tok);
+        i++;
+      } else {
+        unknown.push(tok);
+        i++;
+      }
+    }
+    return { counts, unknown, missingQty };
+  },
+  parseAndPreview() {
+    const text = $("#textOutInput").value;
+    const { counts, unknown, missingQty } = this.parse(text);
+    const kinds = Object.keys(counts).length;
+
+    if (kinds === 0 && missingQty.length === 0) {
+      Toast.show(unknown.length ? "没有识别到有效的「色号 数量」" : "请输入内容");
+      return;
+    }
+
+    // 提示无法识别 / 缺数量
+    const tips = [];
+    if (unknown.length) tips.push(`${unknown.length} 项无法识别`);
+    if (missingQty.length) tips.push(`${missingQty.length} 项缺数量`);
+    if (tips.length) Toast.show(tips.join("，") + "，请在确认单中核对");
+
+    this.close();
+    // 复用 ScanOut 确认单；缺数量的色号也带进去（数量留空标黄）
+    const mergedCounts = { ...counts };
+    missingQty.forEach(code => {
+      const bead = BEAD_COLORS.find(b => b.code.toUpperCase() === code);
+      if (bead && !(bead.id in mergedCounts)) mergedCounts[bead.id] = 0;
+    });
+    ScanOut.open({
+      counts: mergedCounts,
+      title: "文字出库",
+      reason: "text_input",
+      note: "文字出库"
+    });
+  }
+};
+
+// 小工具
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function formatTime(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function formatStamp() {
+  const d = new Date();
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+/* ============================================================
+   模块 8：Tab 切换
+   ============================================================ */
+const Nav = {
+  init() {
+    $("#tabbar").addEventListener("click", e => {
+      const btn = e.target.closest(".tab-item");
+      if (!btn) return;
+      this.switch(btn.dataset.tab);
+    });
+  },
+  switch(tab) {
+    // 离开库存 Tab 时若在批量模式则退出
+    if (tab !== "stock" && Batch.active) Batch.toggleMode();
+    // 离开图库 Tab 时退出图库批量管理
+    if (tab !== "gallery" && Gallery.state.batch) Gallery.toggleBatch();
+    $all(".tab-item").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    $all(".view").forEach(v => v.classList.toggle("active", v.id === `view-${tab}`));
+    window.scrollTo(0, 0);
+    if (tab === "stock") StockView.render();
+    if (tab === "record") RecordView.render();
+    if (tab === "me") Settings.renderStat();
+    if (tab === "gallery") {
+      if (Gallery.state.sub === "patterns") Gallery.render();
+    }
+  }
+};
+
+/* ============================================================
+   启动
+   ============================================================ */
+async function migrateImagesToIDB() {
+  // 把旧 patterns[i].images[0] (dataURL) 搬到 IndexedDB，之后清掉 images 字段
+  const list = Store.data.patterns || [];
+  let migrated = 0;
+  for (const p of list) {
+    if (!p.images || !p.images[0]) continue;
+    const src = p.images[0];
+    if (typeof src !== "string" || !src.startsWith("data:")) { delete p.images; continue; }
+    try {
+      // dataURL -> Blob
+      const resp = await fetch(src);
+      const blob = await resp.blob();
+      await ImageDB.put(p.id, blob);
+      delete p.images;
+      migrated++;
+    } catch (e) { console.warn("迁移失败", p.id, e); }
+  }
+  if (migrated > 0) {
+    Store.save();
+    console.log(`迁移 ${migrated} 张历史图纸到 IndexedDB`);
+  }
+}
+
+// ============================================================
+// 键盘高度追踪：通过 visualViewport 把软键盘高度写入 CSS 变量 --kb-h
+// 让底部 sheet 在输入时上抬，不被键盘遮挡
+// ============================================================
+function initKeyboardTracker() {
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+  // 记录未弹键盘时的最大视口高度作为参照
+  // 有些 Android 浏览器键盘弹起时 innerHeight 也会缩，需要用历史最大值兜底
+  let maxH = Math.max(window.innerHeight, vv ? vv.height : 0, screen.height || 0);
+  let hasFocus = false;
+
+  const setKb = kb => {
+    kb = Math.max(0, Math.round(kb));
+    // 小于 100px 认为不是键盘（可能是浏览器地址栏收缩之类），忽略
+    root.style.setProperty("--kb-h", (kb > 100 ? kb : 0) + "px");
+  };
+
+  const update = () => {
+    // 没有输入焦点时，把当前高度当作新的"未弹键盘"基准
+    const cur = vv ? vv.height : window.innerHeight;
+    if (!hasFocus) {
+      if (cur > maxH) maxH = cur;
+      setKb(0);
+      return;
+    }
+    // 有焦点时，用参照高度 - 当前高度 估算键盘
+    const kb = maxH - cur;
+    setKb(kb);
+  };
+
+  if (vv) {
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+  }
+  window.addEventListener("resize", update);
+
+  document.addEventListener("focusin", e => {
+    const el = e.target;
+    if (!el || !el.matches || !el.matches("input, textarea, select")) return;
+    hasFocus = true;
+    // 键盘弹出是异步的，多次刷新几次
+    setTimeout(update, 50);
+    setTimeout(update, 200);
+    setTimeout(update, 400);
+    // 只对底部 sheet 内的输入滚动到可视区
+    if (!el.closest(".sheet")) return;
+    setTimeout(() => {
+      try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_) {}
+    }, 320);
+  });
+  document.addEventListener("focusout", () => {
+    hasFocus = false;
+    // 键盘收起也需要等一下
+    setTimeout(update, 100);
+    setTimeout(update, 300);
+  });
+  update();
+}
+
+async function boot() {
+  Store.load();
+  Store.save();
+  initKeyboardTracker();
+  Modal.init();
+  Nav.init();
+  Detail.init();
+  RecordView.init();
+  Batch.init();
+  Settings.init();
+  Gallery.init();
+  Maker.init();
+  ScanOut.init();
+  TextOut.init();
+  StockView.init();
+  RecordView.render();
+  try { await migrateImagesToIDB(); } catch (e) { console.warn("图片迁移出错", e); }
+  Gallery.render();
+  console.log(`已加载 ${BEAD_COLORS.length} 色拼豆数据`);
+}
+document.addEventListener("DOMContentLoaded", boot);
+</script>
+</body>
+</html>
