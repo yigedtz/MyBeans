@@ -354,11 +354,10 @@
     background: var(--c-surface); border-radius: 18px 18px 0 0;
     max-width: var(--maxw); margin: 0 auto;
     max-height: 85vh; max-height: 85dvh;
-    max-height: min(85dvh, calc(100dvh - var(--kb-h, 0px) - 12px));
     display: flex; flex-direction: column;
     transform: translateY(101%); transition: transform .28s ease;
   }
-  .sheet.show { transform: translateY(calc(-1 * var(--kb-h, 0px))); }
+  .sheet.show { transform: translateY(0); }
   .sheet-head {
     padding: 16px; border-bottom: 1px solid var(--c-border);
     display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
@@ -3150,63 +3149,19 @@ async function migrateImagesToIDB() {
 }
 
 // ============================================================
-// 键盘高度追踪：通过 visualViewport 把软键盘高度写入 CSS 变量 --kb-h
-// 让底部 sheet 在输入时上抬，不被键盘遮挡
+// 键盘弹出处理：视口缩放交给浏览器（meta viewport interactive-widget=resizes-content），
+// 这里只负责把 sheet 内被聚焦的输入框滚动到可视区，避免被键盘遮挡
 // ============================================================
 function initKeyboardTracker() {
-  const root = document.documentElement;
-  const vv = window.visualViewport;
-  // 记录未弹键盘时的最大视口高度作为参照
-  // 有些 Android 浏览器键盘弹起时 innerHeight 也会缩，需要用历史最大值兜底
-  let maxH = Math.max(window.innerHeight, vv ? vv.height : 0, screen.height || 0);
-  let hasFocus = false;
-
-  const setKb = kb => {
-    kb = Math.max(0, Math.round(kb));
-    // 小于 100px 认为不是键盘（可能是浏览器地址栏收缩之类），忽略
-    root.style.setProperty("--kb-h", (kb > 100 ? kb : 0) + "px");
-  };
-
-  const update = () => {
-    // 没有输入焦点时，把当前高度当作新的"未弹键盘"基准
-    const cur = vv ? vv.height : window.innerHeight;
-    if (!hasFocus) {
-      if (cur > maxH) maxH = cur;
-      setKb(0);
-      return;
-    }
-    // 有焦点时，用参照高度 - 当前高度 估算键盘
-    const kb = maxH - cur;
-    setKb(kb);
-  };
-
-  if (vv) {
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-  }
-  window.addEventListener("resize", update);
-
   document.addEventListener("focusin", e => {
     const el = e.target;
     if (!el || !el.matches || !el.matches("input, textarea, select")) return;
-    hasFocus = true;
-    // 键盘弹出是异步的，多次刷新几次
-    setTimeout(update, 50);
-    setTimeout(update, 200);
-    setTimeout(update, 400);
     // 只对底部 sheet 内的输入滚动到可视区
     if (!el.closest(".sheet")) return;
     setTimeout(() => {
       try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_) {}
     }, 320);
   });
-  document.addEventListener("focusout", () => {
-    hasFocus = false;
-    // 键盘收起也需要等一下
-    setTimeout(update, 100);
-    setTimeout(update, 300);
-  });
-  update();
 }
 
 async function boot() {
