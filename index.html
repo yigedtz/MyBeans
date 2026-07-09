@@ -350,15 +350,16 @@
   }
   .sheet-mask.show { display: block; }
   .sheet {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 86;
+    position: fixed; left: 0; right: 0; bottom: var(--kb-h, 0px); z-index: 86;
     background: var(--c-surface); border-radius: 18px 18px 0 0;
     max-width: var(--maxw); margin: 0 auto;
     max-height: 85vh; max-height: 85dvh;
     max-height: min(85dvh, calc(100dvh - var(--kb-h, 0px) - 12px));
     display: flex; flex-direction: column;
-    transform: translateY(101%); transition: transform .28s ease;
+    transform: translateY(101%);
+    transition: transform .28s ease, bottom .2s ease;
   }
-  .sheet.show { transform: translateY(calc(-1 * var(--kb-h, 0px))); }
+  .sheet.show { transform: translateY(0); }
   .sheet-head {
     padding: 16px; border-bottom: 1px solid var(--c-border);
     display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
@@ -3150,10 +3151,11 @@ async function migrateImagesToIDB() {
 }
 
 // ============================================================
-// 键盘高度追踪：用 visualViewport 实时高度估算软键盘高度，写入 CSS 变量 --kb-h，
-// 让底部 sheet 在输入时上抬，不被键盘遮挡。
-// 关键：基准用 visualViewport 自身的历史最大高度（布局视口内），绝不混入 screen.height，
-// 否则会把状态栏/导航栏也算进"键盘"导致抬升爆表。
+// 键盘高度追踪：写入 CSS 变量 --kb-h，让底部 sheet 用 bottom:var(--kb-h) 顶在键盘上方。
+// 自校正公式：kb = layoutViewportHeight - visualViewport.height - visualViewport.offsetTop
+// - 浏览器缩布局视口时：innerHeight 已变小，差值≈0，靠浏览器自身把 fixed 元素托起；
+// - 浏览器只缩可视视口时：innerHeight 不变，差值=键盘高度，靠 --kb-h 抬升。
+// 两种情况都自动正确，且不依赖任何缓存基准，避免飘移。
 // ============================================================
 function initKeyboardTracker() {
   const root = document.documentElement;
@@ -3166,7 +3168,6 @@ function initKeyboardTracker() {
   };
 
   if (!vv) {
-    // 不支持 visualViewport 的老浏览器：只做滚动兜底
     document.addEventListener("focusin", e => {
       const el = e.target;
       if (el && el.closest && el.closest(".sheet")) {
@@ -3176,14 +3177,11 @@ function initKeyboardTracker() {
     return;
   }
 
-  // 参照高度：可见视口未被键盘压缩时的最大值（只在 visualViewport 内取，随设备旋转等更新）
-  let baseH = vv.height;
-
   const update = () => {
-    const cur = vv.height;
-    // 当前视口比参照还大，说明键盘已收起，更新参照
-    if (cur >= baseH) { baseH = cur; setKb(0); return; }
-    setKb(baseH - cur);
+    // layoutViewport 高度用 documentElement.clientHeight（不含滚动条，稳定）
+    const layoutH = root.clientHeight || window.innerHeight;
+    const kb = layoutH - vv.height - vv.offsetTop;
+    setKb(kb);
   };
 
   vv.addEventListener("resize", update);
@@ -3192,7 +3190,6 @@ function initKeyboardTracker() {
   document.addEventListener("focusin", e => {
     const el = e.target;
     if (!el || !el.matches || !el.matches("input, textarea, select")) return;
-    // 键盘弹出是异步的，刷新几次
     setTimeout(update, 50);
     setTimeout(update, 250);
     setTimeout(update, 450);
