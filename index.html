@@ -354,10 +354,11 @@
     background: var(--c-surface); border-radius: 18px 18px 0 0;
     max-width: var(--maxw); margin: 0 auto;
     max-height: 85vh; max-height: 85dvh;
+    max-height: min(85dvh, calc(100dvh - var(--kb-h, 0px) - 12px));
     display: flex; flex-direction: column;
     transform: translateY(101%); transition: transform .28s ease;
   }
-  .sheet.show { transform: translateY(0); }
+  .sheet.show { transform: translateY(calc(-1 * var(--kb-h, 0px))); }
   .sheet-head {
     padding: 16px; border-bottom: 1px solid var(--c-border);
     display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
@@ -3149,19 +3150,62 @@ async function migrateImagesToIDB() {
 }
 
 // ============================================================
-// 键盘弹出处理：视口缩放交给浏览器（meta viewport interactive-widget=resizes-content），
-// 这里只负责把 sheet 内被聚焦的输入框滚动到可视区，避免被键盘遮挡
+// 键盘高度追踪：用 visualViewport 实时高度估算软键盘高度，写入 CSS 变量 --kb-h，
+// 让底部 sheet 在输入时上抬，不被键盘遮挡。
+// 关键：基准用 visualViewport 自身的历史最大高度（布局视口内），绝不混入 screen.height，
+// 否则会把状态栏/导航栏也算进"键盘"导致抬升爆表。
 // ============================================================
 function initKeyboardTracker() {
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+
+  const setKb = kb => {
+    kb = Math.max(0, Math.round(kb));
+    // 小于 120px 认为不是键盘（地址栏收缩等），忽略
+    root.style.setProperty("--kb-h", (kb >= 120 ? kb : 0) + "px");
+  };
+
+  if (!vv) {
+    // 不支持 visualViewport 的老浏览器：只做滚动兜底
+    document.addEventListener("focusin", e => {
+      const el = e.target;
+      if (el && el.closest && el.closest(".sheet")) {
+        setTimeout(() => { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_) {} }, 320);
+      }
+    });
+    return;
+  }
+
+  // 参照高度：可见视口未被键盘压缩时的最大值（只在 visualViewport 内取，随设备旋转等更新）
+  let baseH = vv.height;
+
+  const update = () => {
+    const cur = vv.height;
+    // 当前视口比参照还大，说明键盘已收起，更新参照
+    if (cur >= baseH) { baseH = cur; setKb(0); return; }
+    setKb(baseH - cur);
+  };
+
+  vv.addEventListener("resize", update);
+  vv.addEventListener("scroll", update);
+
   document.addEventListener("focusin", e => {
     const el = e.target;
     if (!el || !el.matches || !el.matches("input, textarea, select")) return;
-    // 只对底部 sheet 内的输入滚动到可视区
+    // 键盘弹出是异步的，刷新几次
+    setTimeout(update, 50);
+    setTimeout(update, 250);
+    setTimeout(update, 450);
     if (!el.closest(".sheet")) return;
     setTimeout(() => {
       try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_) {}
-    }, 320);
+    }, 350);
   });
+  document.addEventListener("focusout", () => {
+    setTimeout(update, 100);
+    setTimeout(update, 300);
+  });
+  update();
 }
 
 async function boot() {
