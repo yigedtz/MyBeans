@@ -620,6 +620,7 @@
     border: 1px solid var(--c-border); font-size: 15px; font-weight: 700;
     display: flex; align-items: center; justify-content: center; color: var(--c-text-sub);
   }
+  .pixel-toolbar .zoom-btn:disabled { opacity: .4; }
   .pixel-toolbar .zoom-info { font-weight: 600; color: var(--c-text); }
   .pixel-toolbar label { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 
@@ -760,6 +761,7 @@
               <span class="zoom-info" id="zoomInfo">100%</span>
               <button class="zoom-btn" data-act="zoomIn">+</button>
               <button class="zoom-btn" data-act="eraseToggle" id="eraseBtn" title="点击格子删除连通同色块" style="font-size:13px;min-width:52px;width:auto;padding:0 8px">删除多余色块</button>
+              <button class="zoom-btn" data-act="eraseUndo" id="eraseUndoBtn" title="撤回上一次删除" style="font-size:13px;width:auto;padding:0 8px" disabled>↶ 撤回</button>
               <label><input type="checkbox" id="showCodes" /> 显示编号</label>
             </div>
             <div class="pixel-wrap" id="pixelWrap">
@@ -2391,6 +2393,7 @@ const Maker = {
         $("#pixelCanvas").style.cursor = this.state.eraseMode ? "crosshair" : "default";
         if (this.state.eraseMode) Toast.show("删除多余色块模式已开启，点击格子删除连通色块");
       }
+      if (b.dataset.act === "eraseUndo") this.undoErase();
     });
     $("#pixelCanvas").addEventListener("click", e => this.onCanvasClick(e));
     $("#showCodes").addEventListener("change", e => {
@@ -2426,16 +2429,25 @@ const Maker = {
     if (gx < 0 || gx >= r.width || gy < 0 || gy >= r.height) return;
     const targetId = r.gridData[gy][gx];
     if (!targetId) return;
-    const count = this.floodFill(gx, gy, targetId);
+    const cells = this.floodFill(gx, gy, targetId);
+    const count = cells.length;
+    if (count > 0) {
+      // 记录本次删除，供撤回（最多保留最近 30 次）
+      if (!this.state.eraseHistory) this.state.eraseHistory = [];
+      this.state.eraseHistory.push({ id: targetId, cells });
+      if (this.state.eraseHistory.length > 30) this.state.eraseHistory.shift();
+      this.updateUndoBtn();
+    }
     this.renderPixelCanvas();
     this.renderUsage();
     Toast.show(`已擦除 ${beadMap[targetId].code} 色块 ${count} 格`);
   },
+  // 返回被擦除的格子坐标数组 [[x,y],...]
   floodFill(startX, startY, targetId) {
     const r = this.state.result;
     const visited = new Uint8Array(r.width * r.height);
     const stack = [];
-    let count = 0;
+    const cells = [];
     const push = (x, y) => {
       if (x < 0 || x >= r.width || y < 0 || y >= r.height) return;
       const k = y * r.width + x;
@@ -2448,16 +2460,37 @@ const Maker = {
     while (stack.length) {
       const y = stack.pop(), x = stack.pop();
       r.gridData[y][x] = null;
-      count++;
+      cells.push([x, y]);
       // 8 连通：上下左右 + 四个对角
       push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
       push(x + 1, y + 1); push(x - 1, y - 1); push(x + 1, y - 1); push(x - 1, y + 1);
     }
-    if (count > 0) {
-      r.beadCounts[targetId] = (r.beadCounts[targetId] || 0) - count;
+    if (cells.length > 0) {
+      r.beadCounts[targetId] = (r.beadCounts[targetId] || 0) - cells.length;
       if (r.beadCounts[targetId] <= 0) delete r.beadCounts[targetId];
     }
-    return count;
+    return cells;
+  },
+  // 撤回上一次删除
+  undoErase() {
+    const hist = this.state.eraseHistory;
+    if (!hist || hist.length === 0) { Toast.show("没有可撤回的删除"); return; }
+    const r = this.state.result;
+    if (!r) return;
+    const last = hist.pop();
+    last.cells.forEach(([x, y]) => { r.gridData[y][x] = last.id; });
+    r.beadCounts[last.id] = (r.beadCounts[last.id] || 0) + last.cells.length;
+    this.updateUndoBtn();
+    this.renderPixelCanvas();
+    this.renderUsage();
+    Toast.show(`已撤回 ${beadMap[last.id].code} 色块 ${last.cells.length} 格`);
+  },
+  // 更新撤回按钮可用状态
+  updateUndoBtn() {
+    const btn = $("#eraseUndoBtn");
+    if (!btn) return;
+    const has = this.state.eraseHistory && this.state.eraseHistory.length > 0;
+    btn.disabled = !has;
   },
   resolveSize() {
     const img = this.state.sourceImg;
@@ -2502,6 +2535,8 @@ const Maker = {
     }
     this.state.result = { width: tw, height: th, gridData: grid, beadCounts: counts };
     this.state.zoom = 1;
+    this.state.eraseHistory = []; // 新图纸清空撤回历史
+    this.updateUndoBtn();
     $("#makerResult").style.display = "";
     requestAnimationFrame(() => {
       this.state._baseCell = this.computeFitCell();
