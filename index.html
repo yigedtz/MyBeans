@@ -450,7 +450,7 @@
     background: var(--c-danger-soft); color: var(--c-danger); border-radius: 10px; font-weight: 600;
   }
 
-  /* 文字出库输入 */
+  /* 文字识别输入 */
   .text-out-body { padding: 14px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
   .text-out-tip { font-size: 13px; color: var(--c-text-sub); line-height: 1.6; margin-bottom: 10px; }
   .text-out-tip code {
@@ -677,7 +677,7 @@
           <button class="sort-btn active" data-sort="code">编号 <span class="arrow">↑</span></button>
           <button class="sort-btn" data-sort="qty">余量 <span class="arrow"></span></button>
           <button class="batch-btn" id="batchToggle">批量</button>
-          <button class="batch-btn" id="textOutToggle">文字出库</button>
+          <button class="batch-btn" id="textOutToggle">文字识别</button>
           <span class="count-hint" id="countHint"></span>
         </div>
       </div>
@@ -760,8 +760,8 @@
               <button class="zoom-btn" data-act="zoomOut">−</button>
               <span class="zoom-info" id="zoomInfo">100%</span>
               <button class="zoom-btn" data-act="zoomIn">+</button>
-              <button class="zoom-btn" data-act="eraseToggle" id="eraseBtn" title="点击格子删除连通同色块" style="font-size:13px;min-width:52px;width:auto;padding:0 8px">删除多余色块</button>
-              <button class="zoom-btn" data-act="eraseUndo" id="eraseUndoBtn" title="撤回上一次删除" style="font-size:13px;width:auto;padding:0 8px" disabled>↶ 撤回</button>
+              <button class="zoom-btn" data-act="eraseToggle" id="eraseBtn" title="点击格子删除连通同色块" style="font-size:13px;min-width:52px;width:auto;padding:0 8px">删色块</button>
+              <button class="zoom-btn" data-act="eraseUndo" id="eraseUndoBtn" title="撤回上一次删除" style="font-size:15px;width:auto;padding:0 10px" disabled>↶</button>
               <label><input type="checkbox" id="showCodes" /> 显示编号</label>
             </div>
             <div class="pixel-wrap" id="pixelWrap">
@@ -885,20 +885,21 @@
       <div class="batch-total-row" id="scanTotal"></div>
       <div class="row-actions" style="margin-top:0">
         <button class="btn btn-ghost" id="scanAddRow">+ 添加一行</button>
-        <button class="btn btn-primary" id="scanConfirm">确认出库</button>
+        <button class="btn btn-primary" id="scanConfirmIn" style="display:none">确认入库</button>
+        <button class="btn btn-danger" id="scanConfirm">确认出库</button>
       </div>
     </div>
   </div>
 
-  <!-- ===== 文字出库 输入 底部 sheet ===== -->
+  <!-- ===== 文字识别 输入 底部 sheet ===== -->
   <div class="sheet-mask" id="textOutMask"></div>
   <div class="sheet" id="textOutSheet">
     <div class="sheet-head">
-      <h3>文字出库</h3>
+      <h3>文字识别</h3>
       <button class="close" id="textOutClose">×</button>
     </div>
     <div class="text-out-body">
-      <div class="text-out-tip">输入「色号 数量」，可用逗号、空格或换行分隔。例如：<br><code>A11 5，A13 13</code></div>
+      <div class="text-out-tip">输入「色号 数量」，可用逗号、空格或换行分隔。识别后可选择入库或出库。例如：<br><code>A11 5，A13 13</code></div>
       <textarea id="textOutInput" placeholder="A11 5，A13 13&#10;H7 20"></textarea>
     </div>
     <div class="sheet-foot">
@@ -2819,7 +2820,8 @@ const ScanOut = {
   init() {
     $("#scanClose").addEventListener("click", () => this.close());
     $("#scanMask").addEventListener("click", () => this.close());
-    $("#scanConfirm").addEventListener("click", () => this.confirm());
+    $("#scanConfirm").addEventListener("click", () => this.confirm("out"));
+    $("#scanConfirmIn").addEventListener("click", () => this.confirm("in"));
     $("#scanAddRow").addEventListener("click", () => this.addRow());
     $("#scanBody").addEventListener("input", e => this.onInput(e));
     $("#scanBody").addEventListener("click", e => this.onClick(e));
@@ -2831,7 +2833,7 @@ const ScanOut = {
     return this._codeOptionsHTML;
   },
   // counts: { beadId: qty } 或 null（用于 OCR 前打开 loading）
-  open({ counts, title = "识图出库", note = "", patternId = null, loading = false, reason = "image_recognition" }) {
+  open({ counts, title = "识图出库", note = "", patternId = null, loading = false, reason = "image_recognition", allowIn = false }) {
     // counts 转 rows；未识别到时给空行
     let rows = [];
     if (counts && Object.keys(counts).length > 0) {
@@ -2839,8 +2841,10 @@ const ScanOut = {
     } else if (!loading) {
       rows = [{ id: "", q: 0 }];
     }
-    this.state = { rows, note, patternId, title, loading, reason };
+    this.state = { rows, note, patternId, title, loading, reason, allowIn };
     $("#scanTitle").textContent = title || "识图出库";
+    // 是否显示「确认入库」按钮（文字识别场景可入可出）
+    $("#scanConfirmIn").style.display = allowIn ? "" : "none";
     this.render();
     $("#scanMask").classList.add("show");
     $("#scanSheet").classList.add("show");
@@ -2858,7 +2862,8 @@ const ScanOut = {
   close() {
     $("#scanMask").classList.remove("show");
     $("#scanSheet").classList.remove("show");
-    this.state = { rows: [], note: "", patternId: null, title: "", loading: false, reason: "image_recognition" };
+    $("#scanConfirmIn").style.display = "none";
+    this.state = { rows: [], note: "", patternId: null, title: "", loading: false, reason: "image_recognition", allowIn: false };
   },
   addRow() {
     this.state.rows.push({ id: "", q: 0 });
@@ -2916,11 +2921,14 @@ const ScanOut = {
     } else {
       const filled = rows.filter(r => r.id && r.q > 0);
       const totalNeed = filled.reduce((s, r) => s + r.q, 0);
+      // 入库模式不提示库存不足
       let shortKinds = 0, shortNeed = 0;
-      filled.forEach(r => {
-        const cur = Store.data.inventory[r.id]?.currentQty ?? 0;
-        if (cur < r.q) { shortKinds++; shortNeed += (r.q - cur); }
-      });
+      if (!this.state.allowIn) {
+        filled.forEach(r => {
+          const cur = Store.data.inventory[r.id]?.currentQty ?? 0;
+          if (cur < r.q) { shortKinds++; shortNeed += (r.q - cur); }
+        });
+      }
       $("#scanSummary").innerHTML = `
         <div>来源：<b>${escapeHtml(source)}</b></div>
         <div>共 <b>${filled.length}</b> 色 · <b>${totalNeed}</b> 粒
@@ -2949,26 +2957,35 @@ const ScanOut = {
     row.querySelector(".swatch-sm").style.background = b ? b.hex : "#e5e7eb";
   },
   updateFooter() {
-    const { rows, loading } = this.state;
+    const { rows, loading, allowIn } = this.state;
     if (loading) {
       $("#scanTotal").innerHTML = "&nbsp;";
       $("#scanConfirm").disabled = true;
+      $("#scanConfirmIn").disabled = true;
       return;
     }
     const filled = rows.filter(r => r.id && r.q > 0);
     const totalNeed = filled.reduce((s, r) => s + r.q, 0);
-    let shortNeed = 0;
-    filled.forEach(r => {
-      const cur = Store.data.inventory[r.id]?.currentQty ?? 0;
-      if (cur < r.q) shortNeed += (r.q - cur);
-    });
-    $("#scanTotal").innerHTML = shortNeed > 0
-      ? `合计出库 <b>${totalNeed - shortNeed}</b> 粒 · <span style="color:var(--c-danger)">${shortNeed} 粒库存不足将按 0 截断</span>`
-      : `合计出库 <b>${totalNeed}</b> 粒`;
+    if (allowIn) {
+      // 文字识别：可入可出，合计只报总数，不提库存截断
+      $("#scanTotal").innerHTML = `合计 <b>${totalNeed}</b> 粒`;
+    } else {
+      let shortNeed = 0;
+      filled.forEach(r => {
+        const cur = Store.data.inventory[r.id]?.currentQty ?? 0;
+        if (cur < r.q) shortNeed += (r.q - cur);
+      });
+      $("#scanTotal").innerHTML = shortNeed > 0
+        ? `合计出库 <b>${totalNeed - shortNeed}</b> 粒 · <span style="color:var(--c-danger)">${shortNeed} 粒库存不足将按 0 截断</span>`
+        : `合计出库 <b>${totalNeed}</b> 粒`;
+    }
     $("#scanConfirm").disabled = filled.length === 0;
+    $("#scanConfirmIn").disabled = filled.length === 0;
   },
-  async confirm() {
-    const { rows, note, patternId, title, reason } = this.state;
+  // dir: "out" 出库（默认）| "in" 入库
+  async confirm(dir = "out") {
+    const { rows, note, patternId, reason } = this.state;
+    const isIn = dir === "in";
     // 合并同色号的多行
     const merged = {};
     rows.forEach(r => {
@@ -2977,24 +2994,39 @@ const ScanOut = {
     const entries = Object.entries(merged);
     if (entries.length === 0) { Toast.show("请至少填写一项色号和数量"); return; }
     const totalNeed = entries.reduce((s, [, q]) => s + q, 0);
-    // 库存不足二次确认
-    let shortKinds = 0, shortNeed = 0;
-    entries.forEach(([id, q]) => {
-      const cur = Store.data.inventory[id]?.currentQty ?? 0;
-      if (cur < q) { shortKinds++; shortNeed += (q - cur); }
-    });
-    if (shortKinds > 0) {
+    const actText = isIn ? "入库" : "出库";
+
+    let shortNeed = 0;
+    if (isIn) {
+      // 入库二次确认
       const go = await Modal.confirm({
-        title: "库存不足确认",
-        text: `${shortKinds} 色库存不足，缺 ${shortNeed} 粒，将按当前库存扣至 0。是否继续？`,
-        okText: "继续出库",
-        danger: true
+        title: `确认入库`,
+        text: `将对 ${entries.length} 种拼豆按各自数量入库，共 ${totalNeed} 粒。`,
+        okText: "确认入库"
       });
       if (!go) return;
+    } else {
+      // 出库：库存不足二次确认
+      let shortKinds = 0;
+      entries.forEach(([id, q]) => {
+        const cur = Store.data.inventory[id]?.currentQty ?? 0;
+        if (cur < q) { shortKinds++; shortNeed += (q - cur); }
+      });
+      if (shortKinds > 0) {
+        const go = await Modal.confirm({
+          title: "库存不足确认",
+          text: `${shortKinds} 色库存不足，缺 ${shortNeed} 粒，将按当前库存扣至 0。是否继续？`,
+          okText: "继续出库",
+          danger: true
+        });
+        if (!go) return;
+      }
     }
+
+    const sign = isIn ? 1 : -1;
     const logIds = [];
     entries.forEach(([id, q]) => {
-      const ret = Inventory.apply(id, -q, { reason: reason || "image_recognition", note, silent: true });
+      const ret = Inventory.apply(id, sign * q, { reason: reason || "image_recognition", note, silent: true });
       if (ret && ret.logId) logIds.push(ret.logId);
     });
     if (patternId) {
@@ -3004,8 +3036,9 @@ const ScanOut = {
         Store.save();
       }
     }
-    const realOut = totalNeed - shortNeed;
-    Toast.show(`${reason === "text_input" ? "文字出库" : "识图出库"} ${realOut} 粒`);
+    const realQty = isIn ? totalNeed : (totalNeed - shortNeed);
+    const srcText = reason === "text_input" ? "文字" : "识图";
+    Toast.show(`${srcText}${actText} ${realQty} 粒`);
     this.close();
     StockView.render();
     RecordView.render();
@@ -3014,7 +3047,7 @@ const ScanOut = {
 };
 
 /* ============================================================
-   模块 7.12：文字出库 — 解析「色号 数量」文本 → 复用 ScanOut 确认单
+   模块 7.12：文字识别 — 解析「色号 数量」文本 → 复用 ScanOut 确认单（可入可出）
    ============================================================ */
 const TextOut = {
   init() {
@@ -3113,9 +3146,10 @@ const TextOut = {
     });
     ScanOut.open({
       counts: mergedCounts,
-      title: "文字出库",
+      title: "文字识别",
       reason: "text_input",
-      note: "文字出库"
+      note: "文字识别",
+      allowIn: true
     });
   }
 };
